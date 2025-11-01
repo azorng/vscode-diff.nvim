@@ -170,6 +170,20 @@ add_diff_test(test_range_mapping)
 add_diff_test(test_compute_diff)
 add_diff_test(test_render_plan)
 
+# ============================================================================
+# Diff Tool (command-line utility for testing)
+# ============================================================================
+
+add_executable(diff diff_tool.c ${DIFF_CORE_SOURCES})
+target_include_directories(diff PRIVATE include)
+
+if(USE_BUNDLED_UTF8PROC)
+    target_include_directories(diff PRIVATE ${UTF8PROC_INCLUDE})
+    target_link_libraries(diff PRIVATE m)
+else()
+    target_link_libraries(diff PRIVATE ${UTF8PROC_LIBRARY} m)
+endif()
+
 # Print configuration
 message(STATUS "===========================================")
 message(STATUS "  vscode_diff Configuration")

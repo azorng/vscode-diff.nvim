@@ -7,7 +7,7 @@ cd "$(dirname "$0")/libvscode-diff"
 
 echo "Building vscode_diff (standalone mode)..."
 echo "Compiler: /usr/bin/cc"
-echo "Platform: Linux"
+echo "Platform: Darwin"
 
 # Compiler and flags from CMake configuration
 CC="/usr/bin/cc"
