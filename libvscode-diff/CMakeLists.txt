@@ -79,7 +79,12 @@ if(USE_BUNDLED_UTF8PROC)
 endif()
 
 # Shared library target
-add_library(vscode_diff SHARED ${DIFF_CORE_SOURCES})
+if(WIN32 AND MSVC)
+    # Use .def file for explicit exports on Windows MSVC
+    add_library(vscode_diff SHARED ${DIFF_CORE_SOURCES} libvscode_diff.def)
+else()
+    add_library(vscode_diff SHARED ${DIFF_CORE_SOURCES})
+endif()
 
 target_include_directories(vscode_diff
     PUBLIC
@@ -92,6 +97,11 @@ target_include_directories(vscode_diff
 # Define UTF8PROC_STATIC when using bundled utf8proc
 if(USE_BUNDLED_UTF8PROC)
     target_compile_definitions(vscode_diff PRIVATE UTF8PROC_STATIC)
+endif()
+
+# Define BUILDING_DLL for Windows DLL export
+if(WIN32)
+    target_compile_definitions(vscode_diff PRIVATE BUILDING_DLL)
 endif()
 
 if(USE_BUNDLED_UTF8PROC)

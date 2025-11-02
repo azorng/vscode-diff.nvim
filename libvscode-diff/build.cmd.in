@@ -57,7 +57,7 @@ exit /b 1
 
 :build_msvc
 echo Using MSVC compiler...
-cl.exe /LD /O2 /W3 /std:c11 /DUTF8PROC_STATIC /Iinclude /Ivendor /Fobuild\ /Fdbuild\ /Fe:build\libvscode_diff.dll %SOURCES% /link /DLL
+cl.exe /LD /O2 /W3 /std:c11 /DUTF8PROC_STATIC /DBUILDING_DLL /Iinclude /Ivendor /Fobuild\ /Fdbuild\ /Fe:build\libvscode_diff.dll %SOURCES% /link /DLL /DEF:libvscode_diff.def
 goto :build_done
 
 :build_clang

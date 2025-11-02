@@ -3,6 +3,17 @@
 
 #include "types.h"
 
+// DLL export/import declarations for Windows
+#ifdef _WIN32
+  #ifdef BUILDING_DLL
+    #define DLL_EXPORT __declspec(dllexport)
+  #else
+    #define DLL_EXPORT __declspec(dllimport)
+  #endif
+#else
+  #define DLL_EXPORT
+#endif
+
 /**
  * Compute diff between two files.
  * 
@@ -19,7 +30,7 @@
  * VSCode Reference: defaultLinesDiffComputer.ts computeDiff()
  * VSCode Parity: 100% (excluding computeMoves and DP algorithm)
  */
-LinesDiff *compute_diff(const char **original_lines, int original_count,
+DLL_EXPORT LinesDiff *compute_diff(const char **original_lines, int original_count,
                         const char **modified_lines, int modified_count,
                         const DiffOptions *options);
 
@@ -28,13 +39,13 @@ LinesDiff *compute_diff(const char **original_lines, int original_count,
  * 
  * @param diff LinesDiff to free (can be NULL)
  */
-void free_lines_diff(LinesDiff *diff);
+DLL_EXPORT void free_lines_diff(LinesDiff *diff);
 
 /**
  * Get library version string.
  * 
  * @return Version string
  */
-const char *get_version(void);
+DLL_EXPORT const char *get_version(void);
 
 #endif // DEFAULT_LINES_DIFF_COMPUTER_H
