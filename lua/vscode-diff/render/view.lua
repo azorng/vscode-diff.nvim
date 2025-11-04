@@ -31,16 +31,27 @@ local function create_buffer(buffer_type, config)
   end
 end
 
--- Create side-by-side diff view
--- @param original_lines table: Lines from the original version
--- @param modified_lines table: Lines from the modified version
--- @param lines_diff table: Diff result from compute_diff
--- @param opts table: Required settings
---   - left_type string: Buffer type for left buffer (BufferType.VIRTUAL_FILE or REAL_FILE)
---   - right_type string: Buffer type for right buffer (BufferType.VIRTUAL_FILE or REAL_FILE)
---   - left_config table: Configuration for left buffer (depends on left_type)
---   - right_config table: Configuration for right buffer (depends on right_type)
---   - filetype string (optional): Filetype for syntax highlighting
+---@class VirtualFileConfig
+---@field git_root string Root directory of git repository
+---@field git_revision string Git revision (e.g., "HEAD", "HEAD~1", commit SHA)
+---@field relative_path string Path relative to git root
+
+---@class RealFileConfig
+---@field file_path string Absolute path to the file
+
+---@class DiffViewOptions
+---@field left_type string Buffer type for left buffer (BufferType.VIRTUAL_FILE or REAL_FILE)
+---@field right_type string Buffer type for right buffer (BufferType.VIRTUAL_FILE or REAL_FILE)
+---@field left_config VirtualFileConfig|RealFileConfig Configuration for left buffer
+---@field right_config VirtualFileConfig|RealFileConfig Configuration for right buffer
+---@field filetype? string Optional filetype for syntax highlighting
+
+---Create side-by-side diff view
+---@param original_lines string[] Lines from the original version
+---@param modified_lines string[] Lines from the modified version
+---@param lines_diff table Diff result from compute_diff
+---@param opts DiffViewOptions Configuration for the diff view
+---@return table|nil Result containing diff metadata, or nil if deferred
 function M.create(original_lines, modified_lines, lines_diff, opts)
   opts = opts or {}
 
