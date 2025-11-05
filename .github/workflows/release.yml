@@ -21,6 +21,11 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
@@ -49,15 +54,7 @@ jobs:
         id: bump_version
         if: steps.check_existing_tag.outputs.exists == 'true'
         run: |
-          VERSION=${{ steps.read_version.outputs.current_version }}
-          IFS='.' read -ra PARTS <<< "$VERSION"
-          MAJOR=${PARTS[0]}
-          MINOR=${PARTS[1]}
-          PATCH=${PARTS[2]}
-          BUILD=${PARTS[3]:-0}
-          PATCH=$((PATCH + 1))
-          NEW_VERSION="$MAJOR.$MINOR.$PATCH.$BUILD"
-          echo "$NEW_VERSION" > VERSION
+          NEW_VERSION=$(node scripts/bump_version.mjs patch | grep "→" | awk '{print $NF}')
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Bumped version to: $NEW_VERSION"
 
