@@ -21,11 +21,19 @@ jobs:
       version: ${{ steps.get_version.outputs.version }}
       tag_created: ${{ steps.check_tag.outputs.created }}
     steps:
+      - name: Generate GitHub App Token
+        id: generate-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.generate-token.outputs.token }}
+          ref: main
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -66,14 +74,10 @@ jobs:
 
       - name: Commit version bump
         if: steps.check_existing_tag.outputs.exists == 'true'
-        uses: github-actions-x/commit@v2.9
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          push-branch: 'main'
-          commit-message: 'chore: bump version to ${{ steps.bump_version.outputs.new_version }}'
-          files: VERSION
-          name: github-actions[bot]
-          email: github-actions[bot]@users.noreply.github.com
+        run: |
+          git add VERSION
+          git commit -m "chore: bump version to ${{ steps.bump_version.outputs.new_version }}"
+          git push origin main
 
       - name: Get final version
         id: get_version
