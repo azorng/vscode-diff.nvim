@@ -16,26 +16,32 @@ jobs:
           - os: ubuntu-latest
             arch: x64
             runs-on: ubuntu-latest
+            artifact: linux-x64
           # Linux ARM64 (Partner runner - in public beta)
           - os: ubuntu-24.04-arm
             arch: arm64
             runs-on: ubuntu-24.04-arm
+            artifact: linux-arm64
           # macOS x64 (Intel)
           - os: macos-13
             arch: x64
             runs-on: macos-13
+            artifact: macos-x64
           # macOS ARM64 (Apple Silicon M1)
           - os: macos-latest
             arch: arm64
             runs-on: macos-latest
+            artifact: macos-arm64
           # Windows x64
           - os: windows-latest
             arch: x64
             runs-on: windows-latest
+            artifact: windows-x64
           # Windows ARM64 (Partner runner - in public beta)
           - os: windows-11-arm
             arch: arm64
             runs-on: windows-11-arm
+            artifact: windows-arm64
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -117,7 +123,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: libvscode-diff-${{ matrix.os }}-${{ matrix.arch }}
+          name: ${{ matrix.artifact }}
           path: |
             libvscode_diff.so
             libvscode_diff.dylib
