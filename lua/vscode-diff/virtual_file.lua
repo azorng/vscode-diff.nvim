@@ -9,8 +9,13 @@ local api = vim.api
 -- Create a fugitive-style URL for a git revision
 -- Format: vscodediff:///<git-root>///<commit>/<filepath>
 function M.create_url(git_root, commit, filepath)
-  -- Encode components to handle special characters
-  local encoded_root = vim.fn.fnamemodify(git_root, ':p'):gsub('/$', '')
+  -- Normalize and encode components
+  local encoded_root = vim.fn.fnamemodify(git_root, ':p')
+  -- Remove trailing slashes (both / and \)
+  encoded_root = encoded_root:gsub('[/\\]$', '')
+  -- Normalize to forward slashes
+  encoded_root = encoded_root:gsub('\\', '/')
+  
   local encoded_commit = commit or 'HEAD'
   local encoded_path = filepath:gsub('^/', '')
   
@@ -21,7 +26,9 @@ end
 -- Parse a vscodediff:// URL
 -- Returns: git_root, commit, filepath
 function M.parse_url(url)
-  local pattern = '^vscodediff:///(.-)///([^/]+)/(.+)$'
+  -- Pattern expects commit to be a SHA hash (hex chars, case-insensitive)
+  -- Safe since we always resolve branch names to commit hashes
+  local pattern = '^vscodediff:///(.-)///([a-fA-F0-9]+)/(.+)$'
   local git_root, commit, filepath = url:match(pattern)
   return git_root, commit, filepath
 end
@@ -47,15 +54,13 @@ function M.setup()
       end
       
       -- Set buffer options FIRST to prevent LSP attachment
-      -- LSP checks buftype when deciding whether to attach
       vim.bo[buf].buftype = 'nowrite'
-      vim.bo[buf].bufhidden = 'wipe'  -- Auto-delete when hidden
+      vim.bo[buf].bufhidden = 'wipe'
       
-      -- Get the file content from git
+      -- Get the file content from git using the new async API
       local git = require('vscode-diff.git')
-      local full_path = git_root .. '/' .. filepath
       
-      git.get_file_at_revision(commit, full_path, function(err, lines)
+      git.get_file_content(commit, git_root, filepath, function(err, lines)
         vim.schedule(function()
           if err then
             -- Set error message in buffer
