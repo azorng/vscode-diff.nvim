@@ -101,7 +101,12 @@ local function cleanup_diff(tabpage)
   if not diff then
     return
   end
-  
+
+  -- Disable auto-refresh for both buffers
+  local auto_refresh = require('vscode-diff.auto_refresh')
+  auto_refresh.disable(diff.left_bufnr)
+  auto_refresh.disable(diff.right_bufnr)
+
   -- Clear highlights from both buffers
   clear_buffer_highlights(diff.left_bufnr)
   clear_buffer_highlights(diff.right_bufnr)
