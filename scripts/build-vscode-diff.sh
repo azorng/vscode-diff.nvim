@@ -29,17 +29,42 @@ import { DefaultLinesDiffComputer } from './vscode/src/vs/editor/common/diff/def
 function main() {
     const args = process.argv.slice(2);
     
-    // Parse -t flag
+    // Parse flags
     let showTiming = false;
-    let fileArgs = args;
+    let timeoutMs = 5000; // Default timeout: 5 seconds
+    let argIdx = 0;
     
-    if (args.length > 0 && args[0] === '-t') {
-        showTiming = true;
-        fileArgs = args.slice(1);
+    while (argIdx < args.length && args[argIdx].startsWith('-')) {
+        if (args[argIdx] === '-b') {
+            showTiming = true;
+            argIdx++;
+        } else if (args[argIdx] === '-T' || args[argIdx] === '--timeout') {
+            if (argIdx + 1 >= args.length) {
+                console.error(`Error: ${args[argIdx]} requires a value`);
+                console.error('Usage: node vscode-diff.mjs [-b] [-T <ms>] <file1> <file2>');
+                process.exit(1);
+            }
+            timeoutMs = parseInt(args[argIdx + 1], 10);
+            if (isNaN(timeoutMs) || timeoutMs < 0) {
+                console.error('Error: Timeout must be a non-negative number');
+                process.exit(1);
+            }
+            argIdx += 2;
+        } else {
+            console.error(`Error: Unknown option: ${args[argIdx]}`);
+            console.error('Usage: node vscode-diff.mjs [-b] [-T <ms>] <file1> <file2>');
+            process.exit(1);
+        }
     }
     
+    const fileArgs = args.slice(argIdx);
+    
     if (fileArgs.length < 2) {
-        console.error('Usage: node vscode-diff.js [-t] <file1> <file2>');
+        console.error('Usage: node vscode-diff.mjs [-b] [-T <ms>] <file1> <file2>');
+        console.error('Options:');
+        console.error('  -b              Show benchmark timing information');
+        console.error('  -T <ms>         Set timeout in milliseconds (default: 5000, 0 = no timeout)');
+        console.error('  --timeout <ms>  Same as -T');
         process.exit(1);
     }
 
@@ -67,7 +92,7 @@ function main() {
     const startTime = performance.now();
     const result = diffComputer.computeDiff(file1Lines, file2Lines, {
         ignoreTrimWhitespace: false,
-        maxComputationTimeMs: 0,
+        maxComputationTimeMs: timeoutMs,
         computeMoves: false,
         extendToSubwords: false,
     });
@@ -114,7 +139,7 @@ function main() {
     console.log('\n=================================================================');
     
     if (showTiming) {
-        console.log(`Computation time: ${elapsedMs.toFixed(3)} ms`);
+        console.log(`Wall-clock time: ${elapsedMs.toFixed(3)} ms (actual time elapsed)`);
     }
 }
 

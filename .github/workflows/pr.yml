@@ -11,5 +11,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Regression check runs FIRST - fast gating check (~2 min)
+  # If libvscode-diff has no changes, this skips and passes immediately
+  # If there are changes and regression detected, pipeline fails here
+  regression-check:
+    uses: ./.github/workflows/regression-check.yml
+  
+  # Build and test runs ONLY IF regression check passes
+  # This prevents wasting CI resources on builds that will fail PR anyway
   build-and-test:
+    needs: regression-check
     uses: ./.github/workflows/build-and-test.yml

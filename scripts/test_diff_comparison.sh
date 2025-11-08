@@ -3,8 +3,10 @@
 # Test script to compare C diff tool and Node vscode-diff.mjs outputs
 # Dynamically tests top N most revised files from git history (origin/main)
 #
-# Usage: ./test_diff_comparison.sh [-v|--verbose]
-#   -v, --verbose    Show detailed mismatch information
+# Usage: ./test_diff_comparison.sh [OPTIONS]
+#   -q, --quiet      Quiet mode: only show summary (tests/mismatches)
+#   (no options)     Normal mode: show progress and summary
+#   -v, --verbose    Verbose mode: show detailed output
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -18,21 +20,28 @@ NUM_TOP_FILES=10
 TESTS_PER_FILE=30
 # Use origin/main as the reference point for consistent results
 BASE_REF="origin/main"
-# Verbose mode for mismatch details (default: false)
-VERBOSE=false
+# Verbosity level: 0=quiet, 1=normal, 2=verbose
+VERBOSITY=1
 
 # Parse command line arguments
 for arg in "$@"; do
     case $arg in
+        -q|--quiet)
+            VERBOSITY=0
+            shift
+            ;;
         -v|--verbose)
-            VERBOSE=true
+            VERBOSITY=2
             shift
             ;;
         -h|--help)
-            echo "Usage: $0 [-v|--verbose] [-h|--help]"
+            echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  -v, --verbose    Show detailed mismatch information"
+            echo "  -q, --quiet      Quiet mode: only show summary (tests/mismatches)"
+            echo "                   Perfect for comparing test runs"
+            echo "  (no options)     Normal mode: show progress and summary"
+            echo "  -v, --verbose    Verbose mode: show all details and performance"
             echo "  -h, --help       Show this help message"
             exit 0
             ;;
@@ -47,7 +56,9 @@ done
 mkdir -p "$TEMP_DIR"
 
 # Always rebuild C diff binary to ensure latest changes
-echo "Building C diff binary with clean build..."
+if [ $VERBOSITY -ge 1 ]; then
+    echo "Building C diff binary with clean build..."
+fi
 cd "$REPO_ROOT"
 # Remove old binary and object files to force rebuild
 rm -f build/libvscode-diff/diff
@@ -56,17 +67,21 @@ find build/libvscode-diff/CMakeFiles/diff.dir -name "*.o" -delete 2>/dev/null ||
 cmake -B build > /dev/null 2>&1
 cmake --build build --target diff > /dev/null 2>&1
 if [ ! -f "$C_DIFF" ]; then
-    echo "Error: Failed to build C diff binary"
+    echo "Error: Failed to build C diff binary" >&2
     exit 1
 fi
-echo "✓ C diff binary built successfully"
-echo ""
+if [ $VERBOSITY -ge 1 ]; then
+    echo "✓ C diff binary built successfully"
+    echo ""
+fi
 
 if [ ! -f "$NODE_DIFF" ]; then
-    echo "Node diff binary not found. Building..."
-    "$SCRIPT_DIR/build-vscode-diff.sh"
+    if [ $VERBOSITY -ge 1 ]; then
+        echo "Node diff binary not found. Building..."
+    fi
+    "$SCRIPT_DIR/build-vscode-diff.sh" > /dev/null 2>&1
     if [ ! -f "$NODE_DIFF" ]; then
-        echo "Error: Failed to build Node diff binary"
+        echo "Error: Failed to build Node diff binary" >&2
         exit 1
     fi
 fi
@@ -74,13 +89,17 @@ fi
 # Function to generate example files for top N most revised files
 generate_example_files() {
     local num_files=$1
-    echo "Generating example files for top $num_files most revised files from $BASE_REF..."
+    if [ $VERBOSITY -ge 2 ]; then
+        echo "Generating example files for top $num_files most revised files from $BASE_REF..."
+    fi
     
     # Create example directory
     mkdir -p "$EXAMPLE_DIR"
     
     # Get all files that exist in BASE_REF
-    echo "Counting revisions for files in $BASE_REF (this may take a moment)..."
+    if [ $VERBOSITY -ge 2 ]; then
+        echo "Counting revisions for files in $BASE_REF (this may take a moment)..."
+    fi
     
     # Create temporary file to store file:revision pairs
     local temp_file=$(mktemp)
@@ -96,22 +115,28 @@ generate_example_files() {
     local files=($(sort -rn "$temp_file" | head -$num_files | awk '{print $2}'))
     rm -f "$temp_file"
     
-    echo ""
-    echo "Top $num_files most revised files (as of $BASE_REF, with rename tracking):"
-    for i in "${!files[@]}"; do
-        local file="${files[$i]}"
-        local revisions=$(git -C "$REPO_ROOT" log "$BASE_REF" --follow --oneline -- "$file" 2>/dev/null | wc -l)
-        echo "  $((i+1)). $file ($revisions revisions)"
-    done
-    echo ""
+    if [ $VERBOSITY -ge 2 ]; then
+        echo ""
+        echo "Top $num_files most revised files (as of $BASE_REF, with rename tracking):"
+        for i in "${!files[@]}"; do
+            local file="${files[$i]}"
+            local revisions=$(git -C "$REPO_ROOT" log "$BASE_REF" --follow --oneline -- "$file" 2>/dev/null | wc -l)
+            echo "  $((i+1)). $file ($revisions revisions)"
+        done
+        echo ""
+    fi
     
     # For each top file, save all its git history versions up to BASE_REF
     for file in "${files[@]}"; do
-        echo "Processing $file..."
+        if [ $VERBOSITY -ge 2 ]; then
+            echo "Processing $file..."
+        fi
         
         # Check if file exists at BASE_REF
         if ! git -C "$REPO_ROOT" cat-file -e "$BASE_REF:$file" 2>/dev/null; then
-            echo "  Warning: $file not found at $BASE_REF, skipping"
+            if [ $VERBOSITY -ge 2 ]; then
+                echo "  Warning: $file not found at $BASE_REF, skipping"
+            fi
             continue
         fi
         
@@ -128,7 +153,9 @@ generate_example_files() {
             commits+=("${commits_reverse[i]}")
         done
         
-        echo "  Found ${#commits[@]} commits (saving in chronological order)"
+        if [ $VERBOSITY -ge 2 ]; then
+            echo "  Found ${#commits[@]} commits (saving in chronological order)"
+        fi
         
         # Build a map of commit -> filepath by walking through rename history
         # Start with the current filename and walk backwards through renames
@@ -185,16 +212,22 @@ generate_example_files() {
             fi
         done
         
-        echo "  Saved $count versions in chronological order"
+        if [ $VERBOSITY -ge 2 ]; then
+            echo "  Saved $count versions in chronological order"
+        fi
     done
     
-    echo ""
-    echo "Done! Example files generated in $EXAMPLE_DIR"
-    echo "Total files: $(ls -1 "$EXAMPLE_DIR" | wc -l)"
+    if [ $VERBOSITY -ge 2 ]; then
+        echo ""
+        echo "Done! Example files generated in $EXAMPLE_DIR"
+        echo "Total files: $(ls -1 "$EXAMPLE_DIR" | wc -l)"
+    fi
 }
 
 # Get top N most revised files from git history up to BASE_REF
-echo "Finding top $NUM_TOP_FILES most revised files from git history (up to $BASE_REF)..."
+if [ $VERBOSITY -ge 1 ]; then
+    echo "Finding top $NUM_TOP_FILES most revised files from git history (up to $BASE_REF)..."
+fi
 # Note: Can't use --follow here as it requires a single pathspec
 # We'll use --follow when counting individual file revisions
 TOP_FILES=($(git -C "$REPO_ROOT" log "$BASE_REF" --pretty=format: --name-only | \
@@ -212,18 +245,24 @@ for TOP_FILE in "${TOP_FILES[@]}"; do
 done
 
 if [ "$NEED_REGENERATE" = true ]; then
-    echo "Example files missing or incomplete. Regenerating..."
+    if [ $VERBOSITY -ge 1 ]; then
+        echo "Example files missing or incomplete. Regenerating..."
+    fi
     generate_example_files $NUM_TOP_FILES
-    echo ""
+    if [ $VERBOSITY -ge 1 ]; then
+        echo ""
+    fi
 fi
 
-echo "Top revised files (as of $BASE_REF, with rename tracking):"
-for i in "${!TOP_FILES[@]}"; do
-    # Use --follow to track renames for each individual file
-    REVISIONS=$(git -C "$REPO_ROOT" log "$BASE_REF" --follow --oneline -- "${TOP_FILES[$i]}" | wc -l)
-    echo "  $((i+1)). ${TOP_FILES[$i]} ($REVISIONS revisions)"
-done
-echo ""
+if [ $VERBOSITY -ge 2 ]; then
+    echo "Top revised files (as of $BASE_REF, with rename tracking):"
+    for i in "${!TOP_FILES[@]}"; do
+        # Use --follow to track renames for each individual file
+        REVISIONS=$(git -C "$REPO_ROOT" log "$BASE_REF" --follow --oneline -- "${TOP_FILES[$i]}" | wc -l)
+        echo "  $((i+1)). ${TOP_FILES[$i]} ($REVISIONS revisions)"
+    done
+    echo ""
+fi
 
 # Collect version files for each top file (skip files with 0 versions)
 declare -a FILE_GROUPS
@@ -245,10 +284,14 @@ for TOP_FILE in "${TOP_FILES[@]}"; do
         SIZE_KB=$(awk "BEGIN {printf \"%.1f\", $SIZE_BYTES/1024}")
         FILE_METRICS["$BASENAME"]="${LINES}L ${SIZE_KB}KB"
         
-        echo "Found ${#FILES[@]} versions of $BASENAME (chronologically ordered)"
+        if [ $VERBOSITY -ge 2 ]; then
+            echo "Found ${#FILES[@]} versions of $BASENAME (chronologically ordered)"
+        fi
     fi
 done
-echo ""
+if [ $VERBOSITY -ge 2 ]; then
+    echo ""
+fi
 
 # Update TOP_FILES to only include files with versions
 TOP_FILES=("${VALID_TOP_FILES[@]}")
@@ -277,19 +320,23 @@ test_pair() {
     
     # Run C diff tool with timing
     C_OUTPUT="$TEMP_DIR/c_output_${TEST_ID}.txt"
-    C_START=$(date +%s%N)
+    C_START=$(($(date +%s%N)/1000000))
     "$C_DIFF" "$FILE1" "$FILE2" > "$C_OUTPUT" 2>&1
     C_EXIT=$?
-    C_END=$(date +%s%N)
-    C_TIME=$(( (C_END - C_START) / 1000000 )) # Convert to milliseconds
+    C_END=$(($(date +%s%N)/1000000))
+    C_TIME=$((C_END - C_START))
+    # Sanity check: ensure non-negative timing
+    [ $C_TIME -lt 0 ] && C_TIME=0
     
     # Run Node diff tool with timing
     NODE_OUTPUT="$TEMP_DIR/node_output_${TEST_ID}.txt"
-    NODE_START=$(date +%s%N)
+    NODE_START=$(($(date +%s%N)/1000000))
     node "$NODE_DIFF" "$FILE1" "$FILE2" > "$NODE_OUTPUT" 2>&1
     NODE_EXIT=$?
-    NODE_END=$(date +%s%N)
-    NODE_TIME=$(( (NODE_END - NODE_START) / 1000000 )) # Convert to milliseconds
+    NODE_END=$(($(date +%s%N)/1000000))
+    NODE_TIME=$((NODE_END - NODE_START))
+    # Sanity check: ensure non-negative timing
+    [ $NODE_TIME -lt 0 ] && NODE_TIME=0
     
     # Accumulate timing stats
     C_TIMES[$FILE_GROUP]=$((${C_TIMES[$FILE_GROUP]:-0} + C_TIME))
@@ -306,8 +353,8 @@ test_pair() {
         MISMATCH_DETAILS="${MISMATCH_DETAILS}  Node output: $NODE_OUTPUT\n\n"
     fi
     
-    # Progress indicator every 10 tests
-    if [ $((TOTAL_TESTS % 10)) -eq 0 ]; then
+    # Progress indicator every 10 tests (normal and verbose only)
+    if [ $VERBOSITY -ge 1 ] && [ $((TOTAL_TESTS % 10)) -eq 0 ]; then
         echo "Progress: $TOTAL_TESTS tests completed, $MISMATCHES mismatches found"
     fi
 }
@@ -320,8 +367,12 @@ for FILE_IDX in "${!TOP_FILES[@]}"; do
     eval "FILE_ARRAY=(\${$VAR_NAME})"
     NUM_FILES=${#FILE_ARRAY[@]}
     
-    echo "Testing $BASENAME versions (target: $TESTS_PER_FILE tests)..."
-    echo "  Strategy: consecutive commits first, then increasing distances"
+    if [ $VERBOSITY -ge 1 ]; then
+        echo "Testing $BASENAME versions (target: $TESTS_PER_FILE tests)..."
+        if [ $VERBOSITY -ge 2 ]; then
+            echo "  Strategy: consecutive commits first, then increasing distances"
+        fi
+    fi
     TESTS_BEFORE=$TOTAL_TESTS
     
     # Test with increasing commit distances: 1, 2, 3, 4, 5, ...
@@ -333,77 +384,116 @@ for FILE_IDX in "${!TOP_FILES[@]}"; do
             test_pair "${FILE_ARRAY[$i]}" "${FILE_ARRAY[$j]}" "${BASENAME//[^a-zA-Z0-9]/_}_d${distance}_${i}_${j}" "$BASENAME"
         done
     done
-    echo ""
+    if [ $VERBOSITY -ge 1 ]; then
+        echo ""
+    fi
 done
 
-echo ""
-echo "========================================"
-echo "SUMMARY"
-echo "========================================"
-echo "Total tests run: $TOTAL_TESTS"
-echo "Mismatches found: $MISMATCHES"
-echo ""
-
-if [ $MISMATCHES -gt 0 ]; then
-    if [ "$VERBOSE" = true ]; then
-        echo "MISMATCH DETAILS:"
-        echo "========================================"
-        echo -e "$MISMATCH_DETAILS"
-        echo ""
-        echo "Showing first mismatch in detail:"
-        echo "========================================"
-        
-        # Show first mismatch
-        FIRST_C=$(ls -1 "$TEMP_DIR"/c_output_*.txt 2>/dev/null | head -1)
-        FIRST_NODE="${FIRST_C/c_output/node_output}"
-        
-        if [ -f "$FIRST_C" ] && [ -f "$FIRST_NODE" ]; then
-            echo "C diff output:"
-            echo "---"
-            head -50 "$FIRST_C"
+# Output based on verbosity level
+if [ $VERBOSITY -eq 0 ]; then
+    # Quiet mode: single line for easy comparison
+    echo "$TOTAL_TESTS $MISMATCHES"
+else
+    # Normal and verbose modes
+    echo ""
+    echo "========================================"
+    echo "SUMMARY"
+    echo "========================================"
+    echo "Total tests run: $TOTAL_TESTS"
+    echo "Mismatches found: $MISMATCHES"
+    echo ""
+    
+    if [ $MISMATCHES -gt 0 ]; then
+        if [ $VERBOSITY -ge 2 ]; then
+            echo "MISMATCH DETAILS:"
+            echo "========================================"
+            echo -e "$MISMATCH_DETAILS"
             echo ""
-            echo "Node diff output:"
-            echo "---"
-            head -50 "$FIRST_NODE"
-            echo ""
-            echo "Diff between outputs:"
-            echo "---"
-            diff -u "$FIRST_C" "$FIRST_NODE" | head -100
+            echo "Showing first mismatch in detail:"
+            echo "========================================"
+            
+            # Show first mismatch
+            FIRST_C=$(ls -1 "$TEMP_DIR"/c_output_*.txt 2>/dev/null | head -1)
+            FIRST_NODE="${FIRST_C/c_output/node_output}"
+            
+            if [ -f "$FIRST_C" ] && [ -f "$FIRST_NODE" ]; then
+                echo "C diff output:"
+                echo "---"
+                head -50 "$FIRST_C"
+                echo ""
+                echo "Node diff output:"
+                echo "---"
+                head -50 "$FIRST_NODE"
+                echo ""
+                echo "Diff between outputs:"
+                echo "---"
+                diff -u "$FIRST_C" "$FIRST_NODE" | head -100
+            fi
+        else
+            echo "⚠ Mismatches detected. Run with -v or --verbose to see details."
         fi
     else
-        echo "⚠ Mismatches detected. Run with -v or --verbose to see details."
+        echo "✓ All tests passed! No mismatches found."
     fi
-else
-    echo "✓ All tests passed! No mismatches found."
-fi
-
-echo ""
-echo "========================================"
-echo "PERFORMANCE COMPARISON"
-echo "========================================"
-for FILE_IDX in "${!TOP_FILES[@]}"; do
-    TOP_FILE="${TOP_FILES[$FILE_IDX]}"
-    BASENAME=$(basename "$TOP_FILE")
     
-    if [ ${TEST_COUNTS[$BASENAME]:-0} -gt 0 ]; then
-        C_AVG=$(( ${C_TIMES[$BASENAME]} / ${TEST_COUNTS[$BASENAME]} ))
-        NODE_AVG=$(( ${NODE_TIMES[$BASENAME]} / ${TEST_COUNTS[$BASENAME]} ))
-        
-        # Include file metrics in the output
-        METRICS="${FILE_METRICS[$BASENAME]}"
-        echo "$BASENAME [$METRICS] (${TEST_COUNTS[$BASENAME]} tests):"
-        echo "  C diff:    ${C_AVG} ms average"
-        echo "  Node diff: ${NODE_AVG} ms average"
-        
-        if [ $C_AVG -gt 0 ]; then
-            RATIO=$(( (NODE_AVG * 100) / C_AVG ))
-            echo "  Node/C ratio: ${RATIO}%"
-        fi
-        echo ""
+    # Performance comparison (normal and verbose modes)
+    echo ""
+    echo "========================================"
+    echo "PERFORMANCE COMPARISON"
+    echo "========================================"
+    
+    if [ $VERBOSITY -eq 1 ]; then
+        # Normal mode: condensed summary
+        for FILE_IDX in "${!TOP_FILES[@]}"; do
+            TOP_FILE="${TOP_FILES[$FILE_IDX]}"
+            BASENAME=$(basename "$TOP_FILE")
+            
+            if [ ${TEST_COUNTS[$BASENAME]:-0} -gt 0 ]; then
+                C_AVG=$(( ${C_TIMES[$BASENAME]} / ${TEST_COUNTS[$BASENAME]} ))
+                NODE_AVG=$(( ${NODE_TIMES[$BASENAME]} / ${TEST_COUNTS[$BASENAME]} ))
+                
+                # Only show if both timings are valid (positive)
+                if [ $C_AVG -gt 0 ] && [ $NODE_AVG -gt 0 ]; then
+                    RATIO=$(( (NODE_AVG * 100) / C_AVG ))
+                    echo "$BASENAME: C=${C_AVG}ms, Node=${NODE_AVG}ms (${RATIO}%)"
+                elif [ $C_AVG -gt 0 ] || [ $NODE_AVG -gt 0 ]; then
+                    # At least one timing available
+                    echo "$BASENAME: C=${C_AVG}ms, Node=${NODE_AVG}ms (timing error)"
+                fi
+            fi
+        done
+    else
+        # Verbose mode: detailed output
+        for FILE_IDX in "${!TOP_FILES[@]}"; do
+            TOP_FILE="${TOP_FILES[$FILE_IDX]}"
+            BASENAME=$(basename "$TOP_FILE")
+            
+            if [ ${TEST_COUNTS[$BASENAME]:-0} -gt 0 ]; then
+                C_AVG=$(( ${C_TIMES[$BASENAME]} / ${TEST_COUNTS[$BASENAME]} ))
+                NODE_AVG=$(( ${NODE_TIMES[$BASENAME]} / ${TEST_COUNTS[$BASENAME]} ))
+                
+                # Include file metrics in the output
+                METRICS="${FILE_METRICS[$BASENAME]}"
+                echo "$BASENAME [$METRICS] (${TEST_COUNTS[$BASENAME]} tests):"
+                echo "  C diff:    ${C_AVG} ms average"
+                echo "  Node diff: ${NODE_AVG} ms average"
+                
+                # Only show ratio if both timings are valid
+                if [ $C_AVG -gt 0 ] && [ $NODE_AVG -gt 0 ]; then
+                    RATIO=$(( (NODE_AVG * 100) / C_AVG ))
+                    echo "  Node/C ratio: ${RATIO}%"
+                elif [ $C_AVG -le 0 ] || [ $NODE_AVG -le 0 ]; then
+                    echo "  ⚠ Timing error detected (negative or zero values)"
+                fi
+                echo ""
+            fi
+        done
     fi
-done
+fi
 
 # Cleanup
 rm -rf "$TEMP_DIR"
 
-exit $MISMATCHES
+# Always exit 0 - mismatches are reported in output, not exit code
+# The regression check compares outputs, not exit codes
+exit 0

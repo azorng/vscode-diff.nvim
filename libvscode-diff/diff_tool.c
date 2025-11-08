@@ -162,21 +162,45 @@ static void free_lines(char** lines, int count) {
 int main(int argc, char* argv[]) {
     // Parse arguments
     bool show_timing = false;
-    int file_arg_start = 1;
+    int timeout_ms = 5000; // Default timeout: 5 seconds
+    int arg_idx = 1;
 
-    if (argc > 1 && strcmp(argv[1], "-t") == 0) {
-        show_timing = true;
-        file_arg_start = 2;
+    // Parse optional flags
+    while (arg_idx < argc && argv[arg_idx][0] == '-') {
+        if (strcmp(argv[arg_idx], "-b") == 0) {
+            show_timing = true;
+            arg_idx++;
+        } else if (strcmp(argv[arg_idx], "-T") == 0 || strcmp(argv[arg_idx], "--timeout") == 0) {
+            if (arg_idx + 1 >= argc) {
+                fprintf(stderr, "Error: %s requires a value\n", argv[arg_idx]);
+                fprintf(stderr, "Usage: %s [-b] [-T <ms>] <original_file> <modified_file>\n", argv[0]);
+                return 1;
+            }
+            timeout_ms = atoi(argv[arg_idx + 1]);
+            if (timeout_ms < 0) {
+                fprintf(stderr, "Error: Timeout must be non-negative\n");
+                return 1;
+            }
+            arg_idx += 2;
+        } else {
+            fprintf(stderr, "Error: Unknown option: %s\n", argv[arg_idx]);
+            fprintf(stderr, "Usage: %s [-b] [-T <ms>] <original_file> <modified_file>\n", argv[0]);
+            return 1;
+        }
     }
 
-    // Check arguments
-    if (argc - file_arg_start != 2) {
-        fprintf(stderr, "Usage: %s [-t] <original_file> <modified_file>\n", argv[0]);
+    // Check for required file arguments
+    if (argc - arg_idx != 2) {
+        fprintf(stderr, "Usage: %s [-b] [-T <ms>] <original_file> <modified_file>\n", argv[0]);
+        fprintf(stderr, "Options:\n");
+        fprintf(stderr, "  -b              Show benchmark timing information\n");
+        fprintf(stderr, "  -T <ms>         Set timeout in milliseconds (default: 5000, 0 = no timeout)\n");
+        fprintf(stderr, "  --timeout <ms>  Same as -T\n");
         return 1;
     }
 
-    const char* original_file = argv[file_arg_start];
-    const char* modified_file = argv[file_arg_start + 1];
+    const char* original_file = argv[arg_idx];
+    const char* modified_file = argv[arg_idx + 1];
     
     // Read original file
     char** original_lines = NULL;
@@ -200,11 +224,7 @@ int main(int argc, char* argv[]) {
     printf("Modified: %s (%d lines)\n", modified_file, modified_count);
     printf("=================================================================\n\n");
     
-    // Set up diff options (matching Lua FFI defaults)
-    // Allow timeout override via environment variable for testing
-    const char* timeout_env = getenv("VSCODE_DIFF_TIMEOUT");
-    int timeout_ms = timeout_env ? atoi(timeout_env) : 5000;
-    
+    // Set up diff options
     DiffOptions options = {
         .ignore_trim_whitespace = false,
         .max_computation_time_ms = timeout_ms,
