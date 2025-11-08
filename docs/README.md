@@ -3,6 +3,7 @@
 ## User Documentation
 
 - **[BUILD.md](BUILD.md)** - Build system guide (CMake, Makefile, standalone scripts)
+- **[performance.md](performance.md)** - Performance tuning and timeout control
 
 ## Developer Documentation
 
