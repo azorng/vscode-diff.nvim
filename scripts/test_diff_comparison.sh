@@ -448,9 +448,13 @@ else
                 C_AVG=$(( ${C_TIMES[$BASENAME]} / ${TEST_COUNTS[$BASENAME]} ))
                 NODE_AVG=$(( ${NODE_TIMES[$BASENAME]} / ${TEST_COUNTS[$BASENAME]} ))
                 
-                if [ $C_AVG -gt 0 ]; then
+                # Only show if both timings are valid (positive)
+                if [ $C_AVG -gt 0 ] && [ $NODE_AVG -gt 0 ]; then
                     RATIO=$(( (NODE_AVG * 100) / C_AVG ))
                     echo "$BASENAME: C=${C_AVG}ms, Node=${NODE_AVG}ms (${RATIO}%)"
+                elif [ $C_AVG -gt 0 ] || [ $NODE_AVG -gt 0 ]; then
+                    # At least one timing available
+                    echo "$BASENAME: C=${C_AVG}ms, Node=${NODE_AVG}ms (timing error)"
                 fi
             fi
         done
@@ -470,9 +474,12 @@ else
                 echo "  C diff:    ${C_AVG} ms average"
                 echo "  Node diff: ${NODE_AVG} ms average"
                 
-                if [ $C_AVG -gt 0 ]; then
+                # Only show ratio if both timings are valid
+                if [ $C_AVG -gt 0 ] && [ $NODE_AVG -gt 0 ]; then
                     RATIO=$(( (NODE_AVG * 100) / C_AVG ))
                     echo "  Node/C ratio: ${RATIO}%"
+                elif [ $C_AVG -le 0 ] || [ $NODE_AVG -le 0 ]; then
+                    echo "  ⚠ Timing error detected (negative or zero values)"
                 fi
                 echo ""
             fi
