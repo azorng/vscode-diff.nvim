@@ -2,8 +2,6 @@
 local M = {}
 
 local git = require("vscode-diff.git")
-local diff = require("vscode-diff.diff")
-local render = require("vscode-diff.render")
 
 --- Handles diffing the current buffer against a given git revision.
 -- @param revision string: The git revision (e.g., "HEAD", commit hash, branch name) to compare the current file against.
@@ -51,29 +49,18 @@ local function handle_git_diff(revision)
           -- Read fresh buffer content right before creating diff view
           local lines_current = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 
-          local config = require("vscode-diff.config")
-          local diff_options = {
-            max_computation_time_ms = config.options.diff.max_computation_time_ms,
+          -- Create diff view
+          local view = require('vscode-diff.render.view')
+          ---@type SessionConfig
+          local session_config = {
+            mode = "standalone",
+            git_root = git_root,
+            original_path = relative_path,
+            modified_path = relative_path,
+            original_revision = commit_hash,
+            modified_revision = "WORKING",
           }
-          local lines_diff = diff.compute_diff(lines_git, lines_current, diff_options)
-          if not lines_diff then
-            vim.notify("Failed to compute diff", vim.log.levels.ERROR)
-            return
-          end
-
-          render.create_diff_view(lines_git, lines_current, lines_diff, {
-            left_type = render.BufferType.VIRTUAL_FILE,
-            left_config = {
-              git_root = git_root,
-              git_revision = commit_hash,
-              relative_path = relative_path,
-            },
-            right_type = render.BufferType.REAL_FILE,
-            right_config = {
-              file_path = current_file,
-            },
-            filetype = filetype,
-          })
+          view.create(lines_git, lines_current, session_config, filetype)
         end)
       end)
     end)
@@ -84,42 +71,63 @@ local function handle_file_diff(file_a, file_b)
   local lines_a = vim.fn.readfile(file_a)
   local lines_b = vim.fn.readfile(file_b)
 
-  local config = require("vscode-diff.config")
-  local diff_options = {
-    max_computation_time_ms = config.options.diff.max_computation_time_ms,
-  }
-  local lines_diff = diff.compute_diff(lines_a, lines_b, diff_options)
-  if not lines_diff then
-    vim.notify("Failed to compute diff", vim.log.levels.ERROR)
-    return
-  end
-
   -- Determine filetype from first file
   local filetype = vim.filetype.match({ filename = file_a }) or ""
 
-  render.create_diff_view(lines_a, lines_b, lines_diff, {
-    left_type = render.BufferType.REAL_FILE,
-    left_config = { file_path = file_a },
-    right_type = render.BufferType.REAL_FILE,
-    right_config = { file_path = file_b },
-    filetype = filetype,
-  })
+  -- Create diff view
+  local view = require('vscode-diff.render.view')
+  ---@type SessionConfig
+  local session_config = {
+    mode = "standalone",
+    git_root = nil,
+    original_path = file_a,
+    modified_path = file_b,
+    original_revision = nil,
+    modified_revision = nil,
+  }
+  view.create(lines_a, lines_b, session_config, filetype)
 end
 
 function M.vscode_diff(opts)
   local args = opts.fargs
 
   if #args == 0 then
-    vim.notify("Usage: :CodeDiff <file_a> <file_b> OR :CodeDiff <revision>", vim.log.levels.ERROR)
+    vim.notify("TODO: File explorer not implemented yet. Usage: :CodeDiff file <revision> OR :CodeDiff file <file_a> <file_b>", vim.log.levels.WARN)
     return
   end
 
-  if #args == 1 then
-    handle_git_diff(args[1])
-  elseif #args == 2 then
-    handle_file_diff(args[1], args[2])
+  local subcommand = args[1]
+
+  if subcommand == "file" then
+    if #args == 2 then
+      -- :CodeDiff file HEAD
+      handle_git_diff(args[2])
+    elseif #args == 3 then
+      -- :CodeDiff file file_a.txt file_b.txt
+      handle_file_diff(args[2], args[3])
+    else
+      vim.notify("Usage: :CodeDiff file <revision> OR :CodeDiff file <file_a> <file_b>", vim.log.levels.ERROR)
+    end
+  elseif subcommand == "install" or subcommand == "install!" then
+    -- :CodeDiff install or :CodeDiff install!
+    -- Handle both :CodeDiff! install and :CodeDiff install!
+    local force = opts.bang or subcommand == "install!"
+    local installer = require("vscode-diff.installer")
+    
+    if force then
+      vim.notify("Reinstalling libvscode-diff...", vim.log.levels.INFO)
+    end
+    
+    local success, err = installer.install({ force = force, silent = false })
+    
+    if success then
+      vim.notify("libvscode-diff installation successful!", vim.log.levels.INFO)
+    else
+      vim.notify("Installation failed: " .. (err or "unknown error"), vim.log.levels.ERROR)
+    end
   else
-    vim.notify("Usage: :CodeDiff <file_a> <file_b> OR :CodeDiff <revision>", vim.log.levels.ERROR)
+    -- :CodeDiff without "file" is reserved for explorer mode (not implemented yet)
+    vim.notify("TODO: Explorer mode not implemented. Use :CodeDiff file <revision> for now", vim.log.levels.WARN)
   end
 end
 

@@ -14,9 +14,27 @@ virtual_file.setup()
 -- Setup highlights
 render.setup_highlights()
 
--- Register user command
+-- Register user command with subcommand completion
+local function complete_codediff(arg_lead, cmd_line, cursor_pos)
+  local args = vim.split(cmd_line, "%s+", { trimempty = true })
+  
+  -- If no args or just ":CodeDiff", suggest subcommands and common revisions
+  if #args <= 1 then
+    return { "file", "install", "HEAD", "HEAD~1", "main", "master" }
+  end
+  
+  -- If first arg is "file", complete with file paths for remaining args
+  if args[2] == "file" then
+    return vim.fn.getcompletion(arg_lead, "file")
+  end
+  
+  -- Otherwise default file completion
+  return vim.fn.getcompletion(arg_lead, "file")
+end
+
 vim.api.nvim_create_user_command("CodeDiff", commands.vscode_diff, {
   nargs = "*",
-  complete = "file",
-  desc = "VSCode-style diff view (files or git revision)"
+  bang = true,
+  complete = complete_codediff,
+  desc = "VSCode-style diff view: :CodeDiff [explorer] | file <revision> | file <file_a> <file_b> | install"
 })

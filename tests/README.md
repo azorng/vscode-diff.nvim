@@ -22,6 +22,17 @@ Git operations and async handling:
 
 **9 tests**
 
+### ✅ Installer (installer_spec.lua)
+Automatic binary installation and version management:
+- Module API validation
+- VERSION loading from version.lua
+- Library path construction
+- Version detection from filenames
+- Update necessity logic
+- Platform-specific extension handling
+
+**10 tests**
+
 ### ✅ Auto-scroll (autoscroll_spec.lua)
 Diff view scrolling behavior:
 - Scroll to first change
@@ -59,7 +70,7 @@ Focus on **integration points** that C tests cannot validate:
 - System integration (git)
 - UI behavior (scrolling, rendering)
 
-**Total: 36 tests** across 4 spec files using industry-standard plenary.nvim framework.
+**Total: 46 tests** across 5 spec files using industry-standard plenary.nvim framework.
 
 ## What's NOT Covered
 

@@ -4,19 +4,60 @@
 local M = {}
 local ffi = require("ffi")
 
--- Load the C library
-local lib_name = "libvscode_diff"
+-- Get VERSION from version.lua (single source of truth)
+local version = require("vscode-diff.version")
+local VERSION = version.VERSION
+
+-- Load the C library with automatic installation
 local lib_ext
 if ffi.os == "Windows" then
-  lib_ext = ".dll"
+  lib_ext = "dll"
 elseif ffi.os == "OSX" then
-  lib_ext = ".dylib"
+  lib_ext = "dylib"
 else
-  lib_ext = ".so"
+  lib_ext = "so"
 end
 
-local lib_path = vim.fn.fnamemodify(debug.getinfo(1).source:sub(2), ":h:h:h") .. "/" .. lib_name .. lib_ext
-local lib = ffi.load(lib_path)
+-- Build versioned library filename
+local plugin_root = vim.fn.fnamemodify(debug.getinfo(1).source:sub(2), ":h:h:h")
+local lib_name = string.format("libvscode_diff_%s.%s", VERSION, lib_ext)
+local lib_path = plugin_root .. "/" .. lib_name
+
+-- Check if library exists or needs update, if so, install/update it
+-- Skip auto-installation if explicitly disabled (e.g., in tests where library is already built)
+local installer = require("vscode-diff.installer")
+if not vim.env.VSCODE_DIFF_NO_AUTO_INSTALL and installer.needs_update() then
+  local success, err = installer.install({ silent = false })
+  if not success then
+    error(string.format(
+      "libvscode-diff not found and automatic installation failed: %s\n" ..
+      "Troubleshooting:\n" ..
+      "1. Check that curl or wget is installed\n" ..
+      "2. Verify internet connectivity to github.com\n" ..
+      "3. Try manual install: :CodeDiff install!\n" ..
+      "4. Or build from source: run 'make' (Unix) or 'build.cmd' (Windows)\n" ..
+      "5. Download manually from: https://github.com/esmuellert/vscode-diff.nvim/releases",
+      err or "unknown error"
+    ))
+  end
+end
+
+-- Try to load the library - fall back to unversioned name for local builds
+local lib
+local load_ok, load_err = pcall(function()
+  lib = ffi.load(lib_path)
+end)
+
+if not load_ok then
+  -- Try fallback to unversioned library (for local builds and tests)
+  local fallback_lib_name = "libvscode_diff." .. lib_ext
+  local fallback_path = plugin_root .. "/" .. fallback_lib_name
+  if vim.fn.filereadable(fallback_path) == 1 then
+    lib = ffi.load(fallback_path)
+  else
+    error(load_err)
+  end
+end
 
 -- FFI type definitions matching C types.h
 ffi.cdef[[

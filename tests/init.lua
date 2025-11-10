@@ -1,6 +1,9 @@
 -- Test init file for plenary tests
 -- This loads the plugin and plenary.nvim
 
+-- Disable auto-installation in tests (library is already built by CI)
+vim.env.VSCODE_DIFF_NO_AUTO_INSTALL = "1"
+
 -- Add current directory to runtimepath
 vim.opt.rtp:prepend(".")
 vim.opt.swapfile = false

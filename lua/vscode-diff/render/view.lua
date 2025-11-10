@@ -6,178 +6,283 @@ local lifecycle = require('vscode-diff.render.lifecycle')
 local semantic = require('vscode-diff.render.semantic_tokens')
 local virtual_file = require('vscode-diff.virtual_file')
 local auto_refresh = require('vscode-diff.auto_refresh')
+local config = require('vscode-diff.config')
+local diff_module = require('vscode-diff.diff')
 
--- Buffer type enumeration
-M.BufferType = {
-  VIRTUAL_FILE = "VIRTUAL_FILE",  -- Virtual file (vscodediff://) for LSP semantic tokens
-  REAL_FILE = "REAL_FILE",        -- Real file on disk
-}
+-- Helper: Check if revision is virtual (commit hash or STAGED)
+-- Virtual: "STAGED" or commit hash | Real: nil or "WORKING"
+local function is_virtual_revision(revision)
+  return revision ~= nil and revision ~= "WORKING"
+end
 
--- Create a buffer based on its type and configuration
-local function create_buffer(buffer_type, config)
-  if buffer_type == M.BufferType.VIRTUAL_FILE then
-    -- Virtual file: URL is returned, buffer created by :edit command
-    local virtual_url = virtual_file.create_url(config.git_root, config.git_revision, config.relative_path)
-    return nil, virtual_url
-  elseif buffer_type == M.BufferType.REAL_FILE then
-    -- Real file: reuse existing buffer or create new one
-    local existing_buf = vim.fn.bufnr(config.file_path)
+-- Prepare buffer information for loading
+-- Returns: { bufnr = number?, target = string?, needs_edit = boolean }
+-- - If buffer already exists: { bufnr = 123, target = nil, needs_edit = false }
+-- - If needs :edit: { bufnr = nil, target = "path or url", needs_edit = true }
+local function prepare_buffer(is_virtual, git_root, revision, path)
+  if is_virtual then
+    -- Virtual file: generate URL, need to :edit it
+    local virtual_url = virtual_file.create_url(git_root, revision, path)
+    return {
+      bufnr = nil,
+      target = virtual_url,
+      needs_edit = true,
+    }
+  else
+    -- Real file: check if already loaded
+    local existing_buf = vim.fn.bufnr(path)
     if existing_buf ~= -1 then
-      return existing_buf, nil
+      -- Buffer already exists, reuse it
+      return {
+        bufnr = existing_buf,
+        target = nil,
+        needs_edit = false,
+      }
     else
-      -- For real files, we should use :edit to properly load the file
-      -- This ensures filetype detection, no modification flag, etc.
-      return nil, config.file_path
+      -- Buffer doesn't exist, need to :edit it
+      return {
+        bufnr = nil,
+        target = path,
+        needs_edit = true,
+      }
     end
   end
 end
 
----@class VirtualFileConfig
----@field git_root string Root directory of git repository
----@field git_revision string Git revision (e.g., "HEAD", "HEAD~1", commit SHA)
----@field relative_path string Path relative to git root
+---@class SessionConfig
+---@field mode "standalone"|"explorer"
+---@field git_root string?
+---@field original_path string
+---@field modified_path string
+---@field original_revision string?
+---@field modified_revision string?
 
----@class RealFileConfig
----@field file_path string Absolute path to the file
+-- Common logic: Compute diff and render highlights
+-- @param auto_scroll_to_first_hunk boolean: Whether to auto-scroll to first change (default true)
+local function compute_and_render(original_buf, modified_buf, original_lines, modified_lines, original_is_virtual, modified_is_virtual, original_win, modified_win, auto_scroll_to_first_hunk)
+  -- Compute diff
+  local diff_options = {
+    max_computation_time_ms = config.options.diff.max_computation_time_ms,
+  }
+  local lines_diff = diff_module.compute_diff(original_lines, modified_lines, diff_options)
+  if not lines_diff then
+    vim.notify("Failed to compute diff", vim.log.levels.ERROR)
+    return nil
+  end
 
----@class DiffViewOptions
----@field left_type string Buffer type for left buffer (BufferType.VIRTUAL_FILE or REAL_FILE)
----@field right_type string Buffer type for right buffer (BufferType.VIRTUAL_FILE or REAL_FILE)
----@field left_config VirtualFileConfig|RealFileConfig Configuration for left buffer
----@field right_config VirtualFileConfig|RealFileConfig Configuration for right buffer
----@field filetype? string Optional filetype for syntax highlighting
+  -- Render diff highlights
+  core.render_diff(original_buf, modified_buf, original_lines, modified_lines, lines_diff)
 
----Create side-by-side diff view
+  -- Apply semantic tokens for virtual buffers
+  if original_is_virtual then
+    semantic.apply_semantic_tokens(original_buf, modified_buf)
+  end
+  if modified_is_virtual then
+    semantic.apply_semantic_tokens(modified_buf, original_buf)
+  end
+
+  -- Setup scrollbind synchronization (only if windows provided)
+  if original_win and modified_win then
+    -- Save cursor position if we need to preserve it (on update)
+    local saved_cursor = nil
+    if not auto_scroll_to_first_hunk then
+      saved_cursor = vim.api.nvim_win_get_cursor(modified_win)
+    end
+    
+    -- Step 1: Cancel previous scrollbind
+    vim.wo[original_win].scrollbind = false
+    vim.wo[modified_win].scrollbind = false
+
+    -- Step 2: ATOMIC - Reset both to line 1 AND re-enable scrollbind together
+    -- This ensures scrollbind is established with proper baseline for filler lines
+    vim.api.nvim_win_set_cursor(original_win, {1, 0})
+    vim.api.nvim_win_set_cursor(modified_win, {1, 0})
+    vim.wo[original_win].scrollbind = true
+    vim.wo[modified_win].scrollbind = true
+    
+    -- Step 3a: On create, scroll to first change
+    if auto_scroll_to_first_hunk and #lines_diff.changes > 0 then
+      local first_change = lines_diff.changes[1]
+      local target_line = first_change.original.start_line
+
+      pcall(vim.api.nvim_win_set_cursor, original_win, {target_line, 0})
+      pcall(vim.api.nvim_win_set_cursor, modified_win, {target_line, 0})
+
+      if vim.api.nvim_win_is_valid(modified_win) then
+        vim.api.nvim_set_current_win(modified_win)
+        vim.cmd("normal! zz")
+      end
+    -- Step 3b: On update, restore saved cursor position
+    elseif saved_cursor then
+      pcall(vim.api.nvim_win_set_cursor, modified_win, saved_cursor)
+      -- Sync original window to same line (scrollbind will handle column)
+      pcall(vim.api.nvim_win_set_cursor, original_win, {saved_cursor[1], 0})
+    end
+  end
+
+  return lines_diff
+end
+
+-- Common logic: Setup auto-refresh for real file buffers
+local function setup_auto_refresh(original_buf, modified_buf, original_is_virtual, modified_is_virtual)
+  if not original_is_virtual then
+    auto_refresh.enable(original_buf)
+  end
+
+  if not modified_is_virtual then
+    auto_refresh.enable(modified_buf)
+  end
+end
+
 ---@param original_lines string[] Lines from the original version
 ---@param modified_lines string[] Lines from the modified version
----@param lines_diff table Diff result from compute_diff
----@param opts DiffViewOptions Configuration for the diff view
+---@param session_config SessionConfig Session configuration
+---@param filetype? string Optional filetype for syntax highlighting
 ---@return table|nil Result containing diff metadata, or nil if deferred
-function M.create(original_lines, modified_lines, lines_diff, opts)
-  opts = opts or {}
+function M.create(original_lines, modified_lines, session_config, filetype)
+  -- Create new tab for standalone mode
+  if session_config.mode == "standalone" then
+    vim.cmd("tabnew")
+  end
 
-  -- Create buffers based on their types
-  local left_buf, left_url = create_buffer(opts.left_type, opts.left_config or {})
-  local right_buf, right_url = create_buffer(opts.right_type, opts.right_config or {})
+  local tabpage = vim.api.nvim_get_current_tabpage()
 
-  -- Determine if we need to use :edit command (for virtual files or new real files)
-  local left_needs_edit = (left_url ~= nil)
-  local right_needs_edit = (right_url ~= nil)
+  -- Determine if buffers are virtual based on revisions
+  local original_is_virtual = is_virtual_revision(session_config.original_revision)
+  local modified_is_virtual = is_virtual_revision(session_config.modified_revision)
+
+  -- Prepare buffer information
+  local original_info = prepare_buffer(
+    original_is_virtual,
+    session_config.git_root,
+    session_config.original_revision,
+    session_config.original_path
+  )
+  local modified_info = prepare_buffer(
+    modified_is_virtual,
+    session_config.git_root,
+    session_config.modified_revision,
+    session_config.modified_path
+  )
 
   -- Determine if we need to wait for virtual file content to load
-  local has_virtual_buffer = (opts.left_type == M.BufferType.VIRTUAL_FILE) or (opts.right_type == M.BufferType.VIRTUAL_FILE)
-  local defer_render = has_virtual_buffer or left_needs_edit or right_needs_edit
+  local has_virtual_buffer = original_is_virtual or modified_is_virtual
 
-  -- Always defer render when we need to use :edit or have virtual files
-  local result = nil
-
-  -- Create side-by-side windows
-  vim.cmd("tabnew")
+  -- Create side-by-side windows in CURRENT tab (caller should have created new tab if needed)
   local initial_buf = vim.api.nvim_get_current_buf()
-  local left_win = vim.api.nvim_get_current_win()
+  local original_win = vim.api.nvim_get_current_win()
 
-  -- Set left buffer/window
-  if left_needs_edit then
-    vim.cmd("edit " .. vim.fn.fnameescape(left_url))
-    left_buf = vim.api.nvim_get_current_buf()
+  -- Load original buffer/window
+  if original_info.needs_edit then
+    vim.cmd("edit " .. vim.fn.fnameescape(original_info.target))
+    original_info.bufnr = vim.api.nvim_get_current_buf()
   else
-    vim.api.nvim_win_set_buf(left_win, left_buf)
+    vim.api.nvim_win_set_buf(original_win, original_info.bufnr)
   end
 
   vim.cmd("vsplit")
-  local right_win = vim.api.nvim_get_current_win()
+  local modified_win = vim.api.nvim_get_current_win()
 
-  -- Set right buffer/window
-  if right_needs_edit then
-    vim.cmd("edit " .. vim.fn.fnameescape(right_url))
-    right_buf = vim.api.nvim_get_current_buf()
+  -- Load modified buffer/window
+  if modified_info.needs_edit then
+    vim.cmd("edit " .. vim.fn.fnameescape(modified_info.target))
+    modified_info.bufnr = vim.api.nvim_get_current_buf()
   else
-    vim.api.nvim_win_set_buf(right_win, right_buf)
+    vim.api.nvim_win_set_buf(modified_win, modified_info.bufnr)
   end
 
   -- Clean up initial buffer
-  if vim.api.nvim_buf_is_valid(initial_buf) and initial_buf ~= left_buf and initial_buf ~= right_buf then
+  if vim.api.nvim_buf_is_valid(initial_buf) and initial_buf ~= original_info.bufnr and initial_buf ~= modified_info.bufnr then
     pcall(vim.api.nvim_buf_delete, initial_buf, { force = true })
   end
 
-  -- Reset both cursors to line 1 BEFORE enabling scrollbind
-  vim.api.nvim_win_set_cursor(left_win, {1, 0})
-  vim.api.nvim_win_set_cursor(right_win, {1, 0})
-
-  -- Window options
+  -- Window options (scrollbind will be set by compute_and_render)
   local win_opts = {
     number = true,
     relativenumber = false,
     cursorline = true,
-    scrollbind = true,
     wrap = false,
     winbar = "",  -- Disable winbar to ensure alignment between windows
   }
 
   for opt, val in pairs(win_opts) do
-    vim.wo[left_win][opt] = val
-    vim.wo[right_win][opt] = val
+    vim.wo[original_win][opt] = val
+    vim.wo[modified_win][opt] = val
   end
 
   -- Note: Filetype is automatically detected when using :edit for real files
   -- For virtual files, filetype is set in the virtual_file module
 
-  -- Register this diff view for lifecycle management
-  local current_tab = vim.api.nvim_get_current_tabpage()
-  lifecycle.register(current_tab, left_buf, right_buf, left_win, right_win, original_lines, modified_lines, lines_diff)
-
   -- Set up rendering after buffers are ready
   -- For virtual files, we wait for VscodeDiffVirtualFileLoaded event
-  -- Unified rendering function - executes everything once buffers are ready
   local render_everything = function()
-    -- Render diff highlights (content must already be in buffers)
-    result = core.render_diff(left_buf, right_buf, original_lines, modified_lines, lines_diff)
+    local lines_diff = compute_and_render(
+      original_info.bufnr, modified_info.bufnr,
+      original_lines, modified_lines,
+      original_is_virtual, modified_is_virtual,
+      original_win, modified_win,
+      true  -- auto_scroll_to_first_hunk = true on create
+    )
 
-    -- Apply semantic tokens for virtual buffers
-    if opts.left_type == M.BufferType.VIRTUAL_FILE then
-      semantic.apply_semantic_tokens(left_buf, right_buf)
-    end
-    if opts.right_type == M.BufferType.VIRTUAL_FILE then
-      semantic.apply_semantic_tokens(right_buf, left_buf)
-    end
+    if lines_diff then
+      -- Create complete lifecycle session (one step!)
+      lifecycle.create_session(
+        tabpage,
+        session_config.mode,
+        session_config.git_root,
+        session_config.original_path,
+        session_config.modified_path,
+        session_config.original_revision,
+        session_config.modified_revision,
+        original_info.bufnr,
+        modified_info.bufnr,
+        original_win,
+        modified_win,
+        lines_diff
+      )
 
-    -- Auto-scroll to first change
-    if #lines_diff.changes > 0 then
-      local first_change = lines_diff.changes[1]
-      local target_line = first_change.original.start_line
+      -- Enable auto-refresh for real file buffers only
+      setup_auto_refresh(original_info.bufnr, modified_info.bufnr, original_is_virtual, modified_is_virtual)
 
-      pcall(vim.api.nvim_win_set_cursor, left_win, {target_line, 0})
-      pcall(vim.api.nvim_win_set_cursor, right_win, {target_line, 0})
-
-      if vim.api.nvim_win_is_valid(right_win) then
-        vim.api.nvim_set_current_win(right_win)
-        vim.cmd("normal! zz")
-      end
-    end
-
-    -- Enable auto-refresh for any real file buffers
-    -- Both buffers could be real files being compared
-    if opts.left_type == M.BufferType.REAL_FILE then
-      auto_refresh.enable(left_buf, left_buf, right_buf)
-    end
-    
-    if opts.right_type == M.BufferType.REAL_FILE then
-      auto_refresh.enable(right_buf, left_buf, right_buf)
+      -- Setup auto-sync on file switch (after session is complete!)
+      lifecycle.setup_auto_sync_on_file_switch(tabpage, original_is_virtual, modified_is_virtual)
     end
   end
 
   -- Choose timing based on buffer types
   if has_virtual_buffer then
     -- Virtual file(s): Wait for BufReadCmd to load content
-    local trigger_buf = (opts.left_type == M.BufferType.VIRTUAL_FILE) and left_buf or right_buf
-    local group = vim.api.nvim_create_augroup('VscodeDiffVirtualFileHighlight_' .. trigger_buf, { clear = true })
+    -- Track which virtual buffers have loaded
+    local loaded_buffers = {}
+    local group = vim.api.nvim_create_augroup('VscodeDiffVirtualFileHighlight_' .. tabpage, { clear = true })
+
     vim.api.nvim_create_autocmd('User', {
       group = group,
       pattern = 'VscodeDiffVirtualFileLoaded',
       callback = function(event)
-        if event.data and event.data.buf == trigger_buf then
-          vim.schedule(render_everything)
-          vim.api.nvim_del_augroup_by_id(group)
+        if not event.data or not event.data.buf then return end
+
+        local loaded_buf = event.data.buf
+
+        -- Check if this is one of our virtual buffers
+        if (original_is_virtual and loaded_buf == original_info.bufnr) or
+           (modified_is_virtual and loaded_buf == modified_info.bufnr) then
+          loaded_buffers[loaded_buf] = true
+
+          -- Check if all virtual buffers are loaded
+          local all_loaded = true
+          if original_is_virtual and not loaded_buffers[original_info.bufnr] then
+            all_loaded = false
+          end
+          if modified_is_virtual and not loaded_buffers[modified_info.bufnr] then
+            all_loaded = false
+          end
+
+          -- Render once all virtual buffers are ready
+          if all_loaded then
+            vim.schedule(render_everything)
+            vim.api.nvim_del_augroup_by_id(group)
+          end
         end
       end,
     })
@@ -187,12 +292,169 @@ function M.create(original_lines, modified_lines, lines_diff, opts)
   end
 
   return {
-    left_buf = left_buf,
-    right_buf = right_buf,
-    left_win = left_win,
-    right_win = right_win,
-    result = result,
+    original_buf = original_info.bufnr,
+    modified_buf = modified_info.bufnr,
+    original_win = original_win,
+    modified_win = modified_win,
   }
+end
+
+---Update existing diff view with new files/revisions
+---@param tabpage number Tabpage ID of the diff session
+---@param original_lines string[] New lines for original buffer
+---@param modified_lines string[] New lines for modified buffer
+---@param session_config SessionConfig New session configuration (updates both sides)
+---@return boolean success Whether update succeeded
+function M.update(tabpage, original_lines, modified_lines, session_config)
+
+  -- Get existing session
+  local session = lifecycle.get_session(tabpage)
+  if not session then
+    vim.notify("No diff session found for tabpage", vim.log.levels.ERROR)
+    return false
+  end
+
+  -- Get existing buffers and windows
+  local old_original_buf, old_modified_buf = lifecycle.get_buffers(tabpage)
+  local original_win, modified_win = lifecycle.get_windows(tabpage)
+
+  if not old_original_buf or not old_modified_buf or not original_win or not modified_win then
+    vim.notify("Invalid diff session state", vim.log.levels.ERROR)
+    return false
+  end
+
+  -- Disable auto-refresh temporarily
+  auto_refresh.disable(old_original_buf)
+  auto_refresh.disable(old_modified_buf)
+
+  -- Clear highlights from old buffers (before they're replaced/deleted)
+  lifecycle.clear_highlights(old_original_buf)
+  lifecycle.clear_highlights(old_modified_buf)
+
+  -- Determine if new buffers are virtual
+  local original_is_virtual = is_virtual_revision(session_config.original_revision)
+  local modified_is_virtual = is_virtual_revision(session_config.modified_revision)
+
+  -- Prepare new buffer information
+  local original_info = prepare_buffer(
+    original_is_virtual,
+    session_config.git_root,
+    session_config.original_revision,
+    session_config.original_path
+  )
+  local modified_info = prepare_buffer(
+    modified_is_virtual,
+    session_config.git_root,
+    session_config.modified_revision,
+    session_config.modified_path
+  )
+
+  -- Set focus to original window and load buffer
+  vim.api.nvim_set_current_win(original_win)
+  if original_info.needs_edit then
+    vim.cmd("edit " .. vim.fn.fnameescape(original_info.target))
+    original_info.bufnr = vim.api.nvim_get_current_buf()
+  else
+    vim.api.nvim_win_set_buf(original_win, original_info.bufnr)
+  end
+
+  -- Set focus to modified window and load buffer
+  vim.api.nvim_set_current_win(modified_win)
+  if modified_info.needs_edit then
+    vim.cmd("edit " .. vim.fn.fnameescape(modified_info.target))
+    modified_info.bufnr = vim.api.nvim_get_current_buf()
+  else
+    vim.api.nvim_win_set_buf(modified_win, modified_info.bufnr)
+  end
+
+  -- Update lifecycle session metadata
+  lifecycle.update_paths(tabpage, session_config.original_path, session_config.modified_path)
+
+  -- Delete old virtual buffers if they were virtual
+  if lifecycle.is_original_virtual(tabpage) and old_original_buf ~= original_info.bufnr then
+    pcall(vim.api.nvim_buf_delete, old_original_buf, { force = true })
+  end
+  if lifecycle.is_modified_virtual(tabpage) and old_modified_buf ~= modified_info.bufnr then
+    pcall(vim.api.nvim_buf_delete, old_modified_buf, { force = true })
+  end
+
+  -- Update session with new buffer/window IDs
+  -- Note: We need to update lifecycle to support this, or recreate session
+  -- For now, we'll update the stored diff result and metadata
+
+  -- Determine if we need to wait for virtual file content
+  local has_virtual_buffer = original_is_virtual or modified_is_virtual
+
+  local render_everything = function()
+    -- Compute and render (scrollbind will be handled inside)
+    local lines_diff = compute_and_render(
+      original_info.bufnr, modified_info.bufnr,
+      original_lines, modified_lines,
+      original_is_virtual, modified_is_virtual,
+      original_win, modified_win,
+      false  -- auto_scroll_to_first_hunk = false on update (preserve cursor!)
+    )
+
+    if lines_diff then
+      -- Update lifecycle session with all new state
+      lifecycle.update_buffers(tabpage, original_info.bufnr, modified_info.bufnr)
+      lifecycle.update_git_root(tabpage, session_config.git_root)
+      lifecycle.update_revisions(tabpage, session_config.original_revision, session_config.modified_revision)
+      lifecycle.update_diff_result(tabpage, lines_diff)
+      lifecycle.update_changedtick(
+        tabpage,
+        vim.api.nvim_buf_get_changedtick(original_info.bufnr),
+        vim.api.nvim_buf_get_changedtick(modified_info.bufnr)
+      )
+
+      -- Re-enable auto-refresh for real file buffers
+      setup_auto_refresh(original_info.bufnr, modified_info.bufnr, original_is_virtual, modified_is_virtual)
+    end
+  end
+
+  -- Choose timing based on buffer types
+  if has_virtual_buffer then
+    -- Virtual file(s): Wait for BufReadCmd to load content
+    -- Track which virtual buffers have loaded
+    local loaded_buffers = {}
+    local group = vim.api.nvim_create_augroup('VscodeDiffVirtualFileUpdate_' .. tabpage, { clear = true })
+
+    vim.api.nvim_create_autocmd('User', {
+      group = group,
+      pattern = 'VscodeDiffVirtualFileLoaded',
+      callback = function(event)
+        if not event.data or not event.data.buf then return end
+
+        local loaded_buf = event.data.buf
+
+        -- Check if this is one of our virtual buffers
+        if (original_is_virtual and loaded_buf == original_info.bufnr) or
+           (modified_is_virtual and loaded_buf == modified_info.bufnr) then
+          loaded_buffers[loaded_buf] = true
+
+          -- Check if all virtual buffers are loaded
+          local all_loaded = true
+          if original_is_virtual and not loaded_buffers[original_info.bufnr] then
+            all_loaded = false
+          end
+          if modified_is_virtual and not loaded_buffers[modified_info.bufnr] then
+            all_loaded = false
+          end
+
+          -- Render once all virtual buffers are ready
+          if all_loaded then
+            vim.schedule(render_everything)
+            vim.api.nvim_del_augroup_by_id(group)
+          end
+        end
+      end,
+    })
+  else
+    -- Real files only: Defer until :edit completes
+    vim.schedule(render_everything)
+  end
+
+  return true
 end
 
 return M
