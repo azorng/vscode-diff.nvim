@@ -14,6 +14,13 @@ project(libvscode-diff VERSION ${PROJECT_VERSION} LANGUAGES C)
 # Generate compile_commands.json for LSP/clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Generate version.h at build time
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/version.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/include/version.h
+    @ONLY
+)
+
 # C Standard
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -105,6 +112,7 @@ endif()
 target_include_directories(vscode_diff
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
         $<INSTALL_INTERFACE:include>
     PRIVATE
         $<$<BOOL:${USE_BUNDLED_UTF8PROC}>:${UTF8PROC_INCLUDE}>
@@ -207,7 +215,10 @@ endif()
 # thorough testing of internal APIs.
 function(add_diff_test test_name)
     add_executable(${test_name} tests/${test_name}.c ${TEST_COMMON_SOURCES})
-    target_include_directories(${test_name} PRIVATE include)
+    target_include_directories(${test_name} PRIVATE 
+        include
+        ${CMAKE_CURRENT_BINARY_DIR}/include
+    )
     
     # Define BUILDING_DLL for tests to avoid DLL linkage warnings
     # Tests compile sources directly, treating them as if building a library
@@ -284,7 +295,10 @@ endif()
 # ============================================================================
 
 add_executable(diff diff_tool.c ${DIFF_CORE_SOURCES})
-target_include_directories(diff PRIVATE include)
+target_include_directories(diff PRIVATE 
+    include
+    ${CMAKE_CURRENT_BINARY_DIR}/include
+)
 
 # Define BUILDING_DLL for diff CLI to avoid DLL linkage warnings
 # CLI compiles sources directly, treating them as if building a library

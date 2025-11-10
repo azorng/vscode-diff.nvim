@@ -25,3 +25,4 @@ Thumbs.db
 .cache/
 tests/plenary.nvim
 compile_commands.json
+build/include/version.h

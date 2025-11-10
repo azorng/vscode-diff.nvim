@@ -739,7 +739,7 @@ void free_lines_diff(LinesDiff* diff) {
 
 /**
  * Get library version.
- * Reads from VERSION file at repository root.
+ * Version is embedded at build time from VERSION file.
  */
 #include "version.h"
 const char* get_version(void) {
