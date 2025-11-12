@@ -56,6 +56,7 @@ end
 ---@field modified_path string
 ---@field original_revision string?
 ---@field modified_revision string?
+---@field explorer_data table? For explorer mode: { status_result }
 
 -- Common logic: Compute diff and render highlights
 -- @param auto_scroll_to_first_hunk boolean: Whether to auto-scroll to first change (default true)
@@ -140,8 +141,8 @@ end
 ---@param filetype? string Optional filetype for syntax highlighting
 ---@return table|nil Result containing diff metadata, or nil if deferred
 function M.create(original_lines, modified_lines, session_config, filetype)
-  -- Create new tab for standalone mode
-  if session_config.mode == "standalone" then
+  -- Create new tab for both standalone and explorer modes
+  if session_config.mode == "standalone" or session_config.mode == "explorer" then
     vim.cmd("tabnew")
   end
 
@@ -291,6 +292,26 @@ function M.create(original_lines, modified_lines, session_config, filetype)
     vim.schedule(render_everything)
   end
 
+  -- For explorer mode, create the explorer sidebar after diff windows are set up
+  if session_config.mode == "explorer" and session_config.explorer_data then
+    -- Calculate explorer width: 20% of terminal width or 30 columns, whichever is smaller
+    local total_width = vim.o.columns
+    local explorer_width = math.min(30, math.floor(total_width * 0.2))
+    
+    -- Create explorer in left sidebar (explorer manages its own lifecycle and callbacks)
+    local explorer = require('vscode-diff.render.explorer')
+    local status_result = session_config.explorer_data.status_result
+    
+    explorer.create(status_result, session_config.git_root, tabpage, explorer_width)
+    
+    -- After explorer is created, adjust diff window widths to be equal
+    local remaining_width = total_width - explorer_width
+    local diff_width = math.floor(remaining_width / 2)
+    
+    vim.api.nvim_win_set_width(original_win, diff_width)
+    vim.api.nvim_win_set_width(modified_win, diff_width)
+  end
+
   return {
     original_buf = original_info.bufnr,
     modified_buf = modified_info.bufnr,
@@ -304,8 +325,9 @@ end
 ---@param original_lines string[] New lines for original buffer
 ---@param modified_lines string[] New lines for modified buffer
 ---@param session_config SessionConfig New session configuration (updates both sides)
+---@param auto_scroll_to_first_hunk boolean? Whether to auto-scroll to first hunk (default: false)
 ---@return boolean success Whether update succeeded
-function M.update(tabpage, original_lines, modified_lines, session_config)
+function M.update(tabpage, original_lines, modified_lines, session_config, auto_scroll_to_first_hunk)
 
   -- Get existing session
   local session = lifecycle.get_session(tabpage)
@@ -387,12 +409,14 @@ function M.update(tabpage, original_lines, modified_lines, session_config)
 
   local render_everything = function()
     -- Compute and render (scrollbind will be handled inside)
+    -- Use the provided auto_scroll parameter, default to false if not specified
+    local should_auto_scroll = auto_scroll_to_first_hunk == true
     local lines_diff = compute_and_render(
       original_info.bufnr, modified_info.bufnr,
       original_lines, modified_lines,
       original_is_virtual, modified_is_virtual,
       original_win, modified_win,
-      false  -- auto_scroll_to_first_hunk = false on update (preserve cursor!)
+      should_auto_scroll
     )
 
     if lines_diff then

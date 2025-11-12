@@ -88,11 +88,69 @@ local function handle_file_diff(file_a, file_b)
   view.create(lines_a, lines_b, session_config, filetype)
 end
 
+local function handle_explorer()
+  -- Use current buffer's directory if available, otherwise use cwd
+  local current_buf = vim.api.nvim_get_current_buf()
+  local current_file = vim.api.nvim_buf_get_name(current_buf)
+  local check_path = current_file ~= "" and current_file or vim.fn.getcwd()
+
+  -- Check if in git repository
+  git.get_git_root(check_path, function(err_root, git_root)
+    if err_root then
+      vim.schedule(function()
+        vim.notify(err_root, vim.log.levels.ERROR)
+      end)
+      return
+    end
+
+    -- Get git status
+    git.get_status(git_root, function(err_status, status_result)
+      vim.schedule(function()
+        if err_status then
+          vim.notify(err_status, vim.log.levels.ERROR)
+          return
+        end
+
+        -- Check if there are any changes
+        if #status_result.unstaged == 0 and #status_result.staged == 0 then
+          vim.notify("No changes to show", vim.log.levels.INFO)
+          return
+        end
+
+        -- Create initial empty diff view with explorer mode
+        local view = require('vscode-diff.render.view')
+        local empty_lines = {""}
+        
+        -- Create temp file for initial placeholder
+        local temp_path = vim.fn.tempname()
+        vim.fn.writefile(empty_lines, temp_path)
+        
+        ---@type SessionConfig
+        local session_config = {
+          mode = "explorer",
+          git_root = git_root,
+          original_path = temp_path,
+          modified_path = temp_path,
+          original_revision = nil,
+          modified_revision = nil,
+          explorer_data = {
+            status_result = status_result,
+          }
+        }
+        
+        -- view.create handles everything: tab, windows, explorer, and lifecycle
+        view.create(empty_lines, empty_lines, session_config, "")
+      end)
+    end)
+  end)
+end
+
 function M.vscode_diff(opts)
   local args = opts.fargs
 
   if #args == 0 then
-    vim.notify("TODO: File explorer not implemented yet. Usage: :CodeDiff file <revision> OR :CodeDiff file <file_a> <file_b>", vim.log.levels.WARN)
+    -- :CodeDiff without arguments opens explorer mode
+    handle_explorer()
     return
   end
 
@@ -126,8 +184,7 @@ function M.vscode_diff(opts)
       vim.notify("Installation failed: " .. (err or "unknown error"), vim.log.levels.ERROR)
     end
   else
-    -- :CodeDiff without "file" is reserved for explorer mode (not implemented yet)
-    vim.notify("TODO: Explorer mode not implemented. Use :CodeDiff file <revision> for now", vim.log.levels.WARN)
+    vim.notify("Unknown command: " .. subcommand, vim.log.levels.ERROR)
   end
 end
 

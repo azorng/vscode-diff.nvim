@@ -246,4 +246,55 @@ function M.get_file_content(revision, git_root, rel_path, callback)
   )
 end
 
+-- Get git status for current repository (async)
+-- git_root: absolute path to git repository root
+-- callback: function(err, status_result) where status_result is:
+-- {
+--   unstaged = { { path = "file.txt", status = "M"|"A"|"D"|"??" } },
+--   staged = { { path = "file.txt", status = "M"|"A"|"D" } }
+-- }
+function M.get_status(git_root, callback)
+  run_git_async(
+    { "status", "--porcelain" },
+    { cwd = git_root },
+    function(err, output)
+      if err then
+        callback(err, nil)
+        return
+      end
+
+      local result = {
+        unstaged = {},
+        staged = {}
+      }
+
+      for line in output:gmatch("[^\r\n]+") do
+        if #line >= 3 then
+          local index_status = line:sub(1, 1)
+          local worktree_status = line:sub(2, 2)
+          local path = line:sub(4)
+
+          -- Staged changes (index has changes)
+          if index_status ~= " " and index_status ~= "?" then
+            table.insert(result.staged, {
+              path = path,
+              status = index_status
+            })
+          end
+
+          -- Unstaged changes (worktree has changes)
+          if worktree_status ~= " " then
+            table.insert(result.unstaged, {
+              path = path,
+              status = worktree_status == "?" and "??" or worktree_status
+            })
+          end
+        end
+      end
+
+      callback(nil, result)
+    end
+  )
+end
+
 return M
