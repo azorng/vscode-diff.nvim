@@ -443,6 +443,20 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
     end, vim.tbl_extend("force", map_options, { buffer = split.bufnr }))
   end
 
+  -- Navigate to next file
+  if config.options.keymaps.view.next_file then
+    vim.keymap.set("n", config.options.keymaps.view.next_file, function()
+      M.navigate_next(explorer)
+    end, vim.tbl_extend("force", map_options, { buffer = split.bufnr }))
+  end
+
+  -- Navigate to previous file
+  if config.options.keymaps.view.prev_file then
+    vim.keymap.set("n", config.options.keymaps.view.prev_file, function()
+      M.navigate_prev(explorer)
+    end, vim.tbl_extend("force", map_options, { buffer = split.bufnr }))
+  end
+
   -- Select first file by default
   local first_file = nil
   local first_file_group = nil
