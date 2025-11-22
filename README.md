@@ -38,7 +38,29 @@ A Neovim plugin that provides VSCode-style inline diff rendering with two-tier h
   },
   config = function()
     require("vscode-diff.config").setup({
-      -- Optional configuration
+      -- Optional configuration (defaults shown)
+      highlights = {
+        line_insert = "DiffAdd",
+        line_delete = "DiffDelete",
+        char_brightness = 1.4,
+      },
+      diff = {
+        disable_inlay_hints = true,
+        max_computation_time_ms = 5000,
+      },
+      keymaps = {
+        view = {
+          next_hunk = "]c",
+          prev_hunk = "[c",
+          next_file = "]f",
+          prev_file = "[f",
+        },
+        explorer = {
+          select = "<CR>",
+          hover = "K",
+          refresh = "R",
+        },
+      },
     })
   end,
 }

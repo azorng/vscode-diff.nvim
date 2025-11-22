@@ -17,6 +17,21 @@ M.defaults = {
     disable_inlay_hints = true,  -- Disable inlay hints in diff windows for cleaner view
     max_computation_time_ms = 5000,  -- Maximum time for diff computation (5 seconds, VSCode default)
   },
+
+  -- Keymaps
+  keymaps = {
+    view = {
+      next_hunk = "]c",
+      prev_hunk = "[c",
+      next_file = "]f",
+      prev_file = "[f",
+    },
+    explorer = {
+      select = "<CR>",
+      hover = "K",
+      refresh = "R",
+    },
+  },
 }
 
 M.options = vim.deepcopy(M.defaults)

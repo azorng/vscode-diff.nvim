@@ -4,6 +4,7 @@ local M = {}
 local Tree = require("nui.tree")
 local NuiLine = require("nui.line")
 local Split = require("nui.split")
+local config = require("vscode-diff.config")
 
 -- Status symbols and colors
 local STATUS_SYMBOLS = {
@@ -322,25 +323,27 @@ function M.create(status_result, git_root, tabpage, width, base_revision)
   local map_options = { noremap = true, silent = true, nowait = true }
 
   -- Toggle expand/collapse
-  vim.keymap.set("n", "<CR>", function()
-    local node = tree:get_node()
-    if not node then return end
-
-    if node.data and node.data.type == "group" then
-      -- Toggle group
-      if node:is_expanded() then
-        node:collapse()
+  if config.options.keymaps.explorer.select then
+    vim.keymap.set("n", config.options.keymaps.explorer.select, function()
+      local node = tree:get_node()
+      if not node then return end
+  
+      if node.data and node.data.type == "group" then
+        -- Toggle group
+        if node:is_expanded() then
+          node:collapse()
+        else
+          node:expand()
+        end
+        tree:render()
       else
-        node:expand()
+        -- File selected
+        if node.data then
+          explorer.on_file_select(node.data)
+        end
       end
-      tree:render()
-    else
-      -- File selected
-      if node.data then
-        explorer.on_file_select(node.data)
-      end
-    end
-  end, vim.tbl_extend("force", map_options, { buffer = split.bufnr }))
+    end, vim.tbl_extend("force", map_options, { buffer = split.bufnr }))
+  end
 
   -- Double click also works for files
   vim.keymap.set("n", "<2-LeftMouse>", function()
@@ -356,67 +359,71 @@ function M.create(status_result, git_root, tabpage, width, base_revision)
   
   -- Hover to show full path (K key, like LSP hover)
   local hover_win = nil
-  vim.keymap.set("n", "K", function()
-    -- Close existing hover window
-    if hover_win and vim.api.nvim_win_is_valid(hover_win) then
-      vim.api.nvim_win_close(hover_win, true)
-      hover_win = nil
-      return
-    end
-    
-    local node = tree:get_node()
-    if not node or not node.data or node.data.type == "group" then return end
-    
-    local full_path = node.data.path
-    local display_text = git_root .. "/" .. full_path
-    
-    -- Create hover buffer
-    local hover_buf = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_lines(hover_buf, 0, -1, false, { display_text })
-    vim.bo[hover_buf].modifiable = false
-    
-    -- Calculate window position (next to cursor)
-    local cursor = vim.api.nvim_win_get_cursor(0)
-    local row = cursor[1] - 1
-    local col = vim.api.nvim_win_get_width(0)
-    
-    -- Calculate window dimensions with wrapping
-    local max_width = 80
-    local text_len = #display_text
-    local width = math.min(text_len + 2, max_width)
-    local height = math.ceil(text_len / (max_width - 2))  -- Account for padding
-    
-    -- Create floating window with wrap enabled
-    hover_win = vim.api.nvim_open_win(hover_buf, false, {
-      relative = "win",
-      row = row,
-      col = col,
-      width = width,
-      height = height,
-      style = "minimal",
-      border = "rounded",
-    })
-    
-    -- Enable wrap in hover window
-    vim.wo[hover_win].wrap = true
-    
-    -- Auto-close on cursor move or buffer leave
-    vim.api.nvim_create_autocmd({"CursorMoved", "BufLeave"}, {
-      buffer = split.bufnr,
-      once = true,
-      callback = function()
-        if hover_win and vim.api.nvim_win_is_valid(hover_win) then
-          vim.api.nvim_win_close(hover_win, true)
-          hover_win = nil
-        end
-      end,
-    })
-  end, vim.tbl_extend("force", map_options, { buffer = split.bufnr }))
+  if config.options.keymaps.explorer.hover then
+    vim.keymap.set("n", config.options.keymaps.explorer.hover, function()
+      -- Close existing hover window
+      if hover_win and vim.api.nvim_win_is_valid(hover_win) then
+        vim.api.nvim_win_close(hover_win, true)
+        hover_win = nil
+        return
+      end
+      
+      local node = tree:get_node()
+      if not node or not node.data or node.data.type == "group" then return end
+      
+      local full_path = node.data.path
+      local display_text = git_root .. "/" .. full_path
+      
+      -- Create hover buffer
+      local hover_buf = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_lines(hover_buf, 0, -1, false, { display_text })
+      vim.bo[hover_buf].modifiable = false
+      
+      -- Calculate window position (next to cursor)
+      local cursor = vim.api.nvim_win_get_cursor(0)
+      local row = cursor[1] - 1
+      local col = vim.api.nvim_win_get_width(0)
+      
+      -- Calculate window dimensions with wrapping
+      local max_width = 80
+      local text_len = #display_text
+      local width = math.min(text_len + 2, max_width)
+      local height = math.ceil(text_len / (max_width - 2))  -- Account for padding
+      
+      -- Create floating window with wrap enabled
+      hover_win = vim.api.nvim_open_win(hover_buf, false, {
+        relative = "win",
+        row = row,
+        col = col,
+        width = width,
+        height = height,
+        style = "minimal",
+        border = "rounded",
+      })
+      
+      -- Enable wrap in hover window
+      vim.wo[hover_win].wrap = true
+      
+      -- Auto-close on cursor move or buffer leave
+      vim.api.nvim_create_autocmd({"CursorMoved", "BufLeave"}, {
+        buffer = split.bufnr,
+        once = true,
+        callback = function()
+          if hover_win and vim.api.nvim_win_is_valid(hover_win) then
+            vim.api.nvim_win_close(hover_win, true)
+            hover_win = nil
+          end
+        end,
+      })
+    end, vim.tbl_extend("force", map_options, { buffer = split.bufnr }))
+  end
   
   -- Refresh explorer (R key)
-  vim.keymap.set("n", "R", function()
-    M.refresh(explorer)
-  end, vim.tbl_extend("force", map_options, { buffer = split.bufnr }))
+  if config.options.keymaps.explorer.refresh then
+    vim.keymap.set("n", config.options.keymaps.explorer.refresh, function()
+      M.refresh(explorer)
+    end, vim.tbl_extend("force", map_options, { buffer = split.bufnr }))
+  end
 
   -- Select first file by default
   local first_file = nil
