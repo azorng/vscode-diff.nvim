@@ -34,6 +34,8 @@ A Neovim plugin that provides VSCode-style side-by-side diff rendering with two-
 }
 ```
 
+> **Note:** The plugin uses your colorscheme's `DiffAdd` and `DiffDelete` for line-level diffs, and auto-brightens them for character-level highlights (assumes dark colorscheme). For light colorschemes, adjust `char_brightness < 1.0`. See [Highlight Groups](#highlight-groups) for details.
+
 **With custom configuration:**
 ```lua
 {
@@ -43,9 +45,17 @@ A Neovim plugin that provides VSCode-style side-by-side diff rendering with two-
     require("vscode-diff").setup({
       -- Highlight configuration
       highlights = {
-        line_insert = "DiffAdd",      -- Base highlight group for inserted lines
-        line_delete = "DiffDelete",   -- Base highlight group for deleted lines
-        char_brightness = 1.4,        -- Multiplier for character-level highlights (brighter)
+        -- Line-level: accepts highlight group names or hex colors (e.g., "#2ea043")
+        line_insert = "DiffAdd",      -- Line-level insertions
+        line_delete = "DiffDelete",   -- Line-level deletions
+        
+        -- Character-level: accepts highlight group names or hex colors
+        -- If specified, these override char_brightness calculation
+        char_insert = nil,            -- Character-level insertions (nil = auto-derive)
+        char_delete = nil,            -- Character-level deletions (nil = auto-derive)
+        
+        -- Brightness multiplier (only used when char_insert/char_delete are nil)
+        char_brightness = 1.4,        -- Make character highlights 40% brighter
       },
       
       -- Diff view behavior
@@ -266,19 +276,60 @@ end)
   - Side-by-side window management
   - Git status explorer
 
+### Syntax Highlighting
+
+The plugin handles syntax highlighting differently based on buffer type:
+
+**Working files (editable):**
+- Behaves like normal buffers with standard highlighting
+- Inlay hints disabled by default (incompatible with diff highlights)
+- All LSP features available
+
+**Git history files (read-only):**
+- Virtual buffers stored in memory, discarded when tab closes
+- TreeSitter highlighting applied automatically (if installed)
+- LSP not attached (most features meaningless for historical files)
+- Semantic token highlighting fetched via LSP request when available
+
 ### Highlight Groups
 
-The plugin defines four highlight groups matching VSCode's diff colors:
+The plugin defines highlight groups matching VSCode's diff colors:
 
 - `CodeDiffLineInsert` - Light green background for inserted lines
 - `CodeDiffLineDelete` - Light red background for deleted lines
-- `CodeDiffCharInsert` - Deep/dark green for inserted characters (THE "DEEPER COLOR")
-- `CodeDiffCharDelete` - Deep/dark red for deleted characters (THE "DEEPER COLOR")
+- `CodeDiffCharInsert` - Deep/dark green for inserted characters
+- `CodeDiffCharDelete` - Deep/dark red for deleted characters
+- `CodeDiffFiller` - Gray foreground for filler line slashes (`╱╱╱`)
 
-You can customize these in your config:
+**Default behavior:**
+- Uses your colorscheme's `DiffAdd` and `DiffDelete` for line-level highlights
+- Character-level highlights are derived by multiplying brightness by `char_brightness` (default: `1.4`)
+- **Dark colorschemes**: Use `char_brightness > 1.0` to make character highlights brighter (default `1.4` = 40% brighter)
+- **Light colorschemes**: Use `char_brightness < 1.0` to make character highlights darker (e.g., `0.7` = 30% darker)
+
+**Customization examples:**
 
 ```lua
-vim.api.nvim_set_hl(0, "CodeDiffCharInsert", { bg = "#2d6d2d" })
+-- Use hex colors directly
+highlights = {
+  line_insert = "#1d3042",
+  line_delete = "#351d2b",
+  char_brightness = 1.5,
+}
+
+-- Override character colors explicitly
+highlights = {
+  line_insert = "DiffAdd",
+  line_delete = "DiffDelete",
+  char_insert = "#3fb950",
+  char_delete = "#ff7b72",
+}
+
+-- Mix highlight groups and hex colors
+highlights = {
+  line_insert = "String",
+  char_delete = "#ff0000",
+}
 ```
 
 ## Development
@@ -336,25 +387,23 @@ vscode-diff.nvim/
 
 ## Roadmap
 
-### Current Status: MVP Complete ✅
+### Current Status: Complete ✅
 
-- [x] C-based diff computation
+- [x] C-based diff computation with VSCode-identical algorithm
 - [x] Two-tier highlighting (line + character level)
-- [x] Side-by-side rendering
-- [x] Read-only buffers
-- [x] Line alignment with filler lines
-- [x] Lua FFI bindings
+- [x] Side-by-side view with synchronized scrolling
 - [x] Git integration (async operations, status explorer, revision comparison)
-- [x] Integration tests (C, Lua)
+- [x] Auto-refresh on buffer changes (live diff updates)
+- [x] Syntax highlighting preservation (LSP semantic tokens + TreeSitter)
+- [x] Read-only buffers with virtual filler lines for alignment
+- [x] Flexible highlight configuration (colorscheme-aware)
+- [x] Integration tests (C + Lua with plenary.nvim)
 
 ### Future Enhancements
 
-- [ ] Live diff updates on buffer changes
-- [ ] Inline diff mode (single buffer)
-- [ ] Syntax highlighting preservation
+- [ ] Inline diff mode (single buffer view)
 - [ ] Fold support for large diffs
-- [ ] Performance optimization for large files
-- [ ] Custom color schemes
+- [ ] Performance optimization for very large files (10,000+ lines)
 
 ## VSCode Reference
 
