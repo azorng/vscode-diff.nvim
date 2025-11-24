@@ -308,20 +308,18 @@ The plugin defines highlight groups matching VSCode's diff colors:
 - `CodeDiffCharDelete` - Deep/dark red for deleted characters
 - `CodeDiffFiller` - Gray foreground for filler line slashes (`╱╱╱`)
 
-<details>
-<summary><b>Visual Examples</b> (Click to expand)</summary>
+<details open>
+<summary><b>📸 Visual Examples</b> (click to collapse)</summary>
 
-#### Dawnfox Light
+<br>
 
-Default configuration with auto-detected brightness adjustment (`char_brightness = 0.92` for light themes):
+**Dawnfox Light** - Default configuration with auto-detected brightness (`char_brightness = 0.92` for light themes):
 
 ![Dawnfox Light theme with default auto color selection](https://github.com/user-attachments/assets/760fa8be-dba7-4eb5-b71b-c53fb3aa6edf)
 
-<!-- Add more theme examples below as needed:
+<!-- Add more theme examples below:
 
-#### [Theme Name]
-
-Description of configuration or special settings used.
+**[Theme Name]** - Description of configuration used:
 
 ![Alt text](image-url)
 
