@@ -17,16 +17,18 @@ else
     LIB_EXT="so"
 fi
 
-# Auto-detect compiler
-if command -v cc >/dev/null 2>&1; then
-    CC="cc"
-elif command -v gcc >/dev/null 2>&1; then
-    CC="gcc"
-elif command -v clang >/dev/null 2>&1; then
-    CC="clang"
-else
-    echo "Error: No C compiler found (tried: cc, gcc, clang)"
-    exit 1
+# Auto-detect compiler (respect CC environment variable)
+if [ -z "$CC" ]; then
+    if command -v cc >/dev/null 2>&1; then
+        CC="cc"
+    elif command -v gcc >/dev/null 2>&1; then
+        CC="gcc"
+    elif command -v clang >/dev/null 2>&1; then
+        CC="clang"
+    else
+        echo "Error: No C compiler found (tried: cc, gcc, clang)"
+        exit 1
+    fi
 fi
 
 echo "Building vscode_diff (standalone mode)..."
@@ -34,7 +36,7 @@ echo "Compiler: $CC"
 echo "Platform: $PLATFORM"
 
 # Compiler flags
-CFLAGS="-Wall -Wextra -std=c11 -O2 -DNDEBUG -DUTF8PROC_STATIC -Iinclude -Ibuild/include -Ivendor -fPIC"
+CFLAGS="-Wall -Wextra -std=c11 -O2 -DNDEBUG -DUTF8PROC_STATIC -D_POSIX_C_SOURCE=199309L -Iinclude -Ibuild/include -Ivendor -fPIC"
 LDFLAGS="-shared"
 
 # Add -lm for math library on Unix
@@ -63,7 +65,7 @@ mkdir -p build/include
 
 # Generate version.h
 VERSION=$(cat ../VERSION | tr -d '[:space:]')
-sed "s/@''PROJECT_VERSION@/$VERSION/g" include/version.h.in > build/include/version.h"
+sed "s/@''PROJECT_VERSION@/$VERSION/g" include/version.h.in > build/include/version.h
 
 echo "Compiling..."
 $CC $CFLAGS $LDFLAGS -o libvscode_diff.$LIB_EXT $SOURCES
