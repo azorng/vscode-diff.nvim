@@ -76,6 +76,11 @@ local function get_lib_filename(version)
   return string.format("libvscode_diff_%s.%s", version, get_lib_ext())
 end
 
+-- Get unversioned library filename (for manual builds)
+local function get_unversioned_lib_filename()
+  return "libvscode_diff." .. get_lib_ext()
+end
+
 -- Get the current VERSION from version.lua (single source of truth)
 local function get_current_version()
   local version = require("vscode-diff.version")
@@ -242,6 +247,16 @@ function M.install(opts)
   
   -- Check if library already exists and is up-to-date
   if not force then
+    -- Check for unversioned library (manual build) first
+    local unversioned_lib = get_unversioned_lib_filename()
+    local unversioned_path = plugin_root .. "/" .. unversioned_lib
+    if vim.fn.filereadable(unversioned_path) == 1 then
+      if not opts.silent then
+        vim.notify("libvscode-diff (manual build) found at: " .. unversioned_path, vim.log.levels.INFO)
+      end
+      return true
+    end
+
     local installed_version = get_installed_version()
     
     if installed_version and installed_version == current_version then
@@ -332,24 +347,39 @@ end
 
 -- Check if library is installed
 function M.is_installed()
+  local plugin_root = get_plugin_root()
+  
+  -- Check unversioned first (manual build)
+  local unversioned_lib = get_unversioned_lib_filename()
+  if vim.fn.filereadable(plugin_root .. "/" .. unversioned_lib) == 1 then
+    return true
+  end
+
   local current_version = get_current_version()
   if not current_version then
     return false
   end
   
-  local plugin_root = get_plugin_root()
   local lib_path = plugin_root .. "/" .. get_lib_filename(current_version)
   return vim.fn.filereadable(lib_path) == 1
 end
 
 -- Get library path
 function M.get_lib_path()
+  local plugin_root = get_plugin_root()
+  
+  -- Check unversioned first (manual build)
+  local unversioned_lib = get_unversioned_lib_filename()
+  local unversioned_path = plugin_root .. "/" .. unversioned_lib
+  if vim.fn.filereadable(unversioned_path) == 1 then
+    return unversioned_path
+  end
+
   local current_version = get_current_version()
   if not current_version then
     return nil
   end
   
-  local plugin_root = get_plugin_root()
   return plugin_root .. "/" .. get_lib_filename(current_version)
 end
 
@@ -360,6 +390,14 @@ end
 
 -- Check if library needs update
 function M.needs_update()
+  local plugin_root = get_plugin_root()
+  
+  -- Check unversioned first - assume manual build is always up to date
+  local unversioned_lib = get_unversioned_lib_filename()
+  if vim.fn.filereadable(plugin_root .. "/" .. unversioned_lib) == 1 then
+    return false
+  end
+
   local current_version = get_current_version()
   if not current_version then
     return true
