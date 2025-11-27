@@ -4,6 +4,9 @@
 -- Disable auto-installation in tests (library is already built by CI)
 vim.env.VSCODE_DIFF_NO_AUTO_INSTALL = "1"
 
+-- Disable ShaDa (fixes Windows permission issues in CI)
+vim.opt.shadafile = "NONE"
+
 -- Add current directory to runtimepath
 local cwd = vim.fn.getcwd()
 vim.opt.rtp:prepend(cwd)
