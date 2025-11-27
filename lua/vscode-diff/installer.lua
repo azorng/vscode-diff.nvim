@@ -191,7 +191,7 @@ local function check_system_libgomp()
   -- Try to load libgomp using FFI
   local ffi = require("ffi")
   local ok = pcall(function()
-    ffi.load("gomp", true)
+    ffi.load("libgomp.so.1")
   end)
   
   return ok
