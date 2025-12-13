@@ -172,4 +172,37 @@ describe("Conflict Actions with Extmark Tracking", function()
     local result_lines_2 = vim.api.nvim_buf_get_lines(result_bufnr, 0, -1, false)
     assert.are.equal("Incoming Content", result_lines_2[3])
   end)
+
+  it("should allow discard (reset to base) even if conflict is resolved", function()
+    local original_bufnr = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_name(original_bufnr, "Original4")
+    vim.api.nvim_buf_set_lines(original_bufnr, 0, -1, false, { "Incoming Content" })
+    
+    local session = lifecycle.get_session(tabpage)
+    session.original_bufnr = original_bufnr
+    
+    vim.api.nvim_set_current_buf(original_bufnr)
+    vim.api.nvim_win_set_cursor(0, {1, 0})
+    
+    -- 1. Apply Incoming (Resolves it)
+    local success1 = conflict_actions.accept_incoming(tabpage)
+    assert.is_true(success1)
+    
+    local result_lines = vim.api.nvim_buf_get_lines(result_bufnr, 0, -1, false)
+    assert.are.equal("Incoming Content", result_lines[3])
+    
+    -- 2. Discard (Should work and reset to Base)
+    local success2 = conflict_actions.discard(tabpage)
+    assert.is_true(success2)
+    
+    local result_lines_2 = vim.api.nvim_buf_get_lines(result_bufnr, 0, -1, false)
+    assert.are.equal("Line 3 (Base Conflict)", result_lines_2[3])
+    
+    -- 3. Accept Incoming AGAIN (Should work because Discard made it Active again)
+    local success3 = conflict_actions.accept_incoming(tabpage)
+    assert.is_true(success3)
+    
+    local result_lines_3 = vim.api.nvim_buf_get_lines(result_bufnr, 0, -1, false)
+    assert.are.equal("Incoming Content", result_lines_3[3])
+  end)
 end)

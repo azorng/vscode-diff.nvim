@@ -52,13 +52,31 @@ end
 --- @param session table The diff session
 --- @param cursor_line number 1-based line number
 --- @param side string "left" or "right"
+--- @param allow_resolved boolean? If true, return block even if resolved (for discard/reset)
 --- @return table|nil The conflict block containing the cursor
-local function find_conflict_at_cursor(session, cursor_line, side)
+local function find_conflict_at_cursor(session, cursor_line, side, allow_resolved)
   local blocks = session.conflict_blocks
   local range_key = side == "left" and "output1_range" or "output2_range"
   
   for _, block in ipairs(blocks) do
-    if is_block_active(session, block) then
+    local is_match = false
+    
+    if allow_resolved then
+      -- Just check if extmark exists (valid block tracking)
+      if block.extmark_id then
+        local mark = vim.api.nvim_buf_get_extmark_by_id(session.result_bufnr, tracking_ns, block.extmark_id, {})
+        if mark and #mark > 0 then
+          is_match = true
+        end
+      end
+    else
+      -- Check strictly if active (content matches base)
+      if is_block_active(session, block) then
+        is_match = true
+      end
+    end
+
+    if is_match then
       local range = block[range_key]
       if range and cursor_line >= range.start_line and cursor_line < range.end_line then
         return block
@@ -203,7 +221,7 @@ function M.accept_incoming(tabpage)
     return false
   end
 
-  local block = find_conflict_at_cursor(session, cursor_line, side)
+  local block = find_conflict_at_cursor(session, cursor_line, side, false)
   if not block then
     vim.notify("[vscode-diff] No active conflict at cursor position", vim.log.levels.INFO)
     return false
@@ -253,7 +271,7 @@ function M.accept_current(tabpage)
     return false
   end
 
-  local block = find_conflict_at_cursor(session, cursor_line, side)
+  local block = find_conflict_at_cursor(session, cursor_line, side, false)
   if not block then
     vim.notify("[vscode-diff] No active conflict at cursor position", vim.log.levels.INFO)
     return false
@@ -302,7 +320,7 @@ function M.accept_both(tabpage)
     return false
   end
 
-  local block = find_conflict_at_cursor(session, cursor_line, side)
+  local block = find_conflict_at_cursor(session, cursor_line, side, false)
   if not block then
     vim.notify("[vscode-diff] No active conflict at cursor position", vim.log.levels.INFO)
     return false
@@ -361,9 +379,9 @@ function M.discard(tabpage)
     return false
   end
 
-  local block = find_conflict_at_cursor(session, cursor_line, side)
+  local block = find_conflict_at_cursor(session, cursor_line, side, true) -- Allow resolved
   if not block then
-    vim.notify("[vscode-diff] No active conflict at cursor position", vim.log.levels.INFO)
+    vim.notify("[vscode-diff] No conflict at cursor position", vim.log.levels.INFO)
     return false
   end
 
