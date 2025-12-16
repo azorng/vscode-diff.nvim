@@ -79,6 +79,7 @@ https://github.com/user-attachments/assets/64c41f01-dffe-4318-bce4-16eec8de356e
       diff = {
         disable_inlay_hints = true,         -- Disable inlay hints in diff windows for cleaner view
         max_computation_time_ms = 5000,     -- Maximum time for diff computation (VSCode default)
+        hide_merge_artifacts = false,       -- Hide merge tool temp files (*.orig, *.BACKUP.*, *.BASE.*, *.LOCAL.*, *.REMOTE.*)
       },
       
       -- Keymaps in diff view
@@ -95,6 +96,14 @@ https://github.com/user-attachments/assets/64c41f01-dffe-4318-bce4-16eec8de356e
           select = "<CR>",    -- Open diff for selected file
           hover = "K",        -- Show file diff preview
           refresh = "R",      -- Refresh git status
+        },
+        conflict = {
+          accept_incoming = "<leader>ct",  -- Accept incoming (theirs/left) change
+          accept_current = "<leader>co",   -- Accept current (ours/right) change
+          accept_both = "<leader>cb",      -- Accept both changes (incoming first)
+          discard = "<leader>cx",          -- Discard both, keep base
+          next_conflict = "]x",            -- Jump to next conflict
+          prev_conflict = "[x",            -- Jump to previous conflict
         },
       },
     })
