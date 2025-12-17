@@ -653,27 +653,35 @@ function M.create(session_config, filetype)
 
   -- For explorer mode, create the explorer sidebar after diff windows are set up
   if session_config.mode == "explorer" and session_config.explorer_data then
-    -- Calculate explorer width: 20% of terminal width or 40 columns, whichever is smaller (matches neo-tree default)
-    local total_width = vim.o.columns
-    local explorer_width = math.min(40, math.floor(total_width * 0.2))
-    
-    -- Create explorer in left sidebar (explorer manages its own lifecycle and callbacks)
+    -- Get explorer position from config
+    local explorer_config = config.options.explorer or {}
+    local position = explorer_config.position or "left"
+
+    -- Create explorer (explorer manages its own lifecycle and callbacks)
     local explorer = require('vscode-diff.render.explorer')
     local status_result = session_config.explorer_data.status_result
-    
-    local explorer_obj = explorer.create(status_result, session_config.git_root, tabpage, explorer_width, session_config.original_revision, session_config.modified_revision)
-    
+
+    local explorer_obj = explorer.create(status_result, session_config.git_root, tabpage, nil, session_config.original_revision, session_config.modified_revision)
+
     -- Store explorer reference in lifecycle
     lifecycle.set_explorer(tabpage, explorer_obj)
-    
+
     -- Note: Keymaps will be set when first file is selected via update()
-    
-    -- After explorer is created, adjust diff window widths to be equal
-    local remaining_width = total_width - explorer_width
-    local diff_width = math.floor(remaining_width / 2)
-    
-    vim.api.nvim_win_set_width(original_win, diff_width)
-    vim.api.nvim_win_set_width(modified_win, diff_width)
+
+    -- Adjust diff window sizes based on explorer position
+    if position == "bottom" then
+      -- For bottom position, diff windows take full width, equalize them
+      vim.cmd('wincmd =')
+    else
+      -- For left position, calculate remaining width and split equally
+      local total_width = vim.o.columns
+      local explorer_width = explorer_config.width or 40
+      local remaining_width = total_width - explorer_width
+      local diff_width = math.floor(remaining_width / 2)
+
+      vim.api.nvim_win_set_width(original_win, diff_width)
+      vim.api.nvim_win_set_width(modified_win, diff_width)
+    end
   end
 
   return {

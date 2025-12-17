@@ -25,6 +25,13 @@ M.defaults = {
     max_computation_time_ms = 5000,  -- Maximum time for diff computation (5 seconds, VSCode default)
   },
 
+  -- Explorer panel configuration
+  explorer = {
+    position = "left",  -- "left" or "bottom"
+    width = 40,         -- Width when position is "left" (columns)
+    height = 15,        -- Height when position is "bottom" (lines)
+  },
+
   -- Keymaps
   keymaps = {
     view = {
