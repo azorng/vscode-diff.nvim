@@ -55,6 +55,14 @@ local function create_file_nodes(files, git_root, group)
   return nodes
 end
 
+-- Indent marker characters (neo-tree style)
+local INDENT_MARKERS = {
+  edge = "│",      -- Vertical line for non-last items
+  item = "├",      -- Branch for non-last items
+  last = "└",      -- Branch for last item
+  none = " ",      -- Space when parent was last item
+}
+
 -- Create tree nodes with directory hierarchy (tree mode)
 local function create_tree_file_nodes(files, git_root, group)
   -- Build directory structure
@@ -84,7 +92,8 @@ local function create_tree_file_nodes(files, git_root, group)
   end
 
   -- Convert to Tree.Node recursively
-  local function build_nodes(subtree, parent_path)
+  -- indent_state: array of booleans, true = ancestor at that level is last child
+  local function build_nodes(subtree, parent_path, indent_state)
     local nodes = {}
     local sorted_keys = {}
 
@@ -101,13 +110,22 @@ local function create_tree_file_nodes(files, git_root, group)
       return a < b
     end)
 
-    for _, key in ipairs(sorted_keys) do
+    local total = #sorted_keys
+    for idx, key in ipairs(sorted_keys) do
       local item = subtree[key]
       local full_path = parent_path ~= "" and (parent_path .. "/" .. key) or key
+      local is_last = (idx == total)
+
+      -- Copy parent indent state and add current level
+      local node_indent_state = {}
+      for i, v in ipairs(indent_state) do
+        node_indent_state[i] = v
+      end
+      node_indent_state[#node_indent_state + 1] = is_last
 
       if item._is_dir then
-        -- Directory node
-        local children = build_nodes(item._children, full_path)
+        -- Directory node - children need to know this dir's is_last status
+        local children = build_nodes(item._children, full_path, node_indent_state)
         nodes[#nodes + 1] = Tree.Node({
           text = key,
           data = {
@@ -115,6 +133,7 @@ local function create_tree_file_nodes(files, git_root, group)
             name = key,
             dir_path = full_path,
             group = group,
+            indent_state = node_indent_state,
           }
         }, children)
       else
@@ -135,6 +154,7 @@ local function create_tree_file_nodes(files, git_root, group)
             status_color = status_info.color,
             git_root = git_root,
             group = group,
+            indent_state = node_indent_state,
           }
         })
       end
@@ -143,7 +163,7 @@ local function create_tree_file_nodes(files, git_root, group)
     return nodes
   end
 
-  return build_nodes(dir_tree, "")
+  return build_nodes(dir_tree, "", {})
 end
 
 -- Create explorer tree structure
@@ -183,15 +203,43 @@ local function prepare_node(node, max_width, selected_path, selected_group)
   local line = NuiLine()
   local data = node.data or {}
 
+  -- Helper to build indent string with markers (for tree mode)
+  local function build_indent_markers(indent_state, hl_group)
+    if not indent_state or #indent_state == 0 then
+      return ""
+    end
+
+    local indent_parts = {}
+    -- All levels except the last one: show edge or space
+    for i = 1, #indent_state - 1 do
+      if indent_state[i] then
+        -- Ancestor was last child, show space
+        indent_parts[#indent_parts + 1] = INDENT_MARKERS.none .. " "
+      else
+        -- Ancestor was not last, show edge
+        indent_parts[#indent_parts + 1] = INDENT_MARKERS.edge .. " "
+      end
+    end
+    -- Last level: show item or last marker
+    if indent_state[#indent_state] then
+      indent_parts[#indent_parts + 1] = INDENT_MARKERS.last .. " "
+    else
+      indent_parts[#indent_parts + 1] = INDENT_MARKERS.item .. " "
+    end
+    return table.concat(indent_parts)
+  end
+
   if data.type == "group" then
     -- Group header
     line:append(" ", "Directory")
     line:append(node.text, "Directory")
   elseif data.type == "directory" then
-    -- Directory node (tree view mode) - match file icon style
-    local indent = string.rep("  ", node:get_depth() - 1)
+    -- Directory node (tree view mode) - with indent markers
+    local indent = build_indent_markers(data.indent_state, "NeoTreeIndentMarker")
     local folder_icon, folder_color = get_folder_icon(node:is_expanded())
-    line:append(indent, "Directory")
+    if #indent > 0 then
+      line:append(indent, "NeoTreeIndentMarker")
+    end
     line:append(folder_icon .. " ", folder_color or "Directory")
     line:append(data.name, "Directory")
   else
@@ -206,8 +254,16 @@ local function prepare_node(node, max_width, selected_path, selected_group)
     local view_mode = explorer_config.view_mode or "list"
 
     -- File entry - VSCode style: filename (bold) + directory (dimmed) + status (right-aligned)
-    local indent = string.rep("  ", node:get_depth() - 1)
-    line:append(indent, get_hl("Normal"))
+    local indent
+    if view_mode == "tree" and data.indent_state then
+      indent = build_indent_markers(data.indent_state, "NeoTreeIndentMarker")
+      if #indent > 0 then
+        line:append(indent, "NeoTreeIndentMarker")
+      end
+    else
+      indent = string.rep("  ", node:get_depth() - 1)
+      line:append(indent, get_hl("Normal"))
+    end
 
     local icon_part = ""
     if data.icon then
