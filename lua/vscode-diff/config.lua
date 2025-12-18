@@ -30,6 +30,7 @@ M.defaults = {
     position = "left",  -- "left" or "bottom"
     width = 40,         -- Width when position is "left" (columns)
     height = 15,        -- Height when position is "bottom" (lines)
+    view_mode = "list", -- "list" (flat file list) or "tree" (directory tree)
   },
 
   -- Keymaps
