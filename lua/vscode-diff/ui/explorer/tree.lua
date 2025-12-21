@@ -40,7 +40,7 @@ function M.create_tree_data(status_result, git_root, base_revision)
     return {
       Tree.Node({
         text = string.format("Changes (%d)", #unstaged),
-        data = { type = "group", name = "unstaged", label = "Changes", count = #unstaged },
+        data = { type = "group", name = "unstaged" },
       }, unstaged_nodes),
     }
   else
@@ -51,20 +51,20 @@ function M.create_tree_data(status_result, git_root, base_revision)
     if #conflict_nodes > 0 then
       table.insert(tree_nodes, Tree.Node({
         text = string.format("Merge Changes (%d)", #conflicts),
-        data = { type = "group", name = "conflicts", label = "Merge Changes", count = #conflicts },
+        data = { type = "group", name = "conflicts" },
       }, conflict_nodes))
     end
     
     -- Unstaged changes
     table.insert(tree_nodes, Tree.Node({
       text = string.format("Changes (%d)", #unstaged),
-      data = { type = "group", name = "unstaged", label = "Changes", count = #unstaged },
+      data = { type = "group", name = "unstaged" },
     }, unstaged_nodes))
     
     -- Staged changes
     table.insert(tree_nodes, Tree.Node({
       text = string.format("Staged Changes (%d)", #staged),
-      data = { type = "group", name = "staged", label = "Staged Changes", count = #staged },
+      data = { type = "group", name = "staged" },
     }, staged_nodes))
     
     return tree_nodes
