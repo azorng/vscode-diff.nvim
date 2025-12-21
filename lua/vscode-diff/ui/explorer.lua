@@ -5,7 +5,7 @@ local Tree = require("nui.tree")
 local NuiLine = require("nui.line")
 local Split = require("nui.split")
 local config = require("vscode-diff.config")
-local filter = require("vscode-diff.render.explorer.filter")
+local filter = require("vscode-diff.ui.explorer.filter")
 
 -- Merge artifact patterns (created by git mergetool)
 local MERGE_ARTIFACT_PATTERNS = {
@@ -530,9 +530,9 @@ function M.create(status_result, git_root, tabpage, width, base_revision, target
 
   -- File selection callback - manages its own lifecycle
   local function on_file_select(file_data)
-    local git = require('vscode-diff.git')
-    local view = require('vscode-diff.render.view')
-    local lifecycle = require('vscode-diff.render.lifecycle')
+    local git = require('vscode-diff.core.git')
+    local view = require('vscode-diff.ui.view')
+    local lifecycle = require('vscode-diff.ui.lifecycle')
     
     local file_path = file_data.path
     local old_path = file_data.old_path  -- For renames: path in original revision
@@ -905,7 +905,7 @@ end
 
 -- Refresh explorer with updated git status
 function M.refresh(explorer)
-  local git = require('vscode-diff.git')
+  local git = require('vscode-diff.core.git')
   
   -- Skip refresh if explorer is hidden
   if explorer.is_hidden then

@@ -1,7 +1,7 @@
 -- Test: Explorer Mode
 -- Validates git status explorer functionality, window management, and file selection
 
-local git = require("vscode-diff.git")
+local git = require('vscode-diff.core.git')
 
 -- Setup CodeDiff command for tests
 local function setup_command()
@@ -403,7 +403,7 @@ describe("Explorer Mode", function()
     end)
     
     local tabpage = vim.api.nvim_get_current_tabpage()
-    local has_lifecycle, lifecycle = pcall(require, 'vscode-diff.render.lifecycle')
+    local has_lifecycle, lifecycle = pcall(require, 'vscode-diff.ui.lifecycle')
     if not has_lifecycle then
       pending("lifecycle module not available in test context")
       return

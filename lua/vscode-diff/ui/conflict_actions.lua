@@ -2,9 +2,9 @@
 -- Handles accept current/incoming/both/none actions
 local M = {}
 
-local lifecycle = require('vscode-diff.render.lifecycle')
+local lifecycle = require('vscode-diff.ui.lifecycle')
 local config = require('vscode-diff.config')
-local auto_refresh = require('vscode-diff.auto_refresh')
+local auto_refresh = require('vscode-diff.ui.auto_refresh')
 
 local tracking_ns = vim.api.nvim_create_namespace("vscode-diff-conflict-tracking")
 local result_signs_ns = vim.api.nvim_create_namespace("vscode-diff-result-signs")
@@ -26,7 +26,7 @@ end
 local function make_repeatable(fn)
   return function()
     _pending_action = fn
-    vim.go.operatorfunc = "v:lua.require'vscode-diff.render.conflict_actions'.run_repeatable_action"
+    vim.go.operatorfunc = "v:lua.require'vscode-diff.ui.conflict_actions'.run_repeatable_action"
     return "g@l"
   end
 end
@@ -253,7 +253,7 @@ end
 function M.refresh_all_conflict_signs(session)
   if not session or not session.conflict_blocks then return end
   
-  local highlights = require('vscode-diff.render.highlights')
+  local highlights = require('vscode-diff.ui.highlights')
   local ns_conflict = highlights.ns_conflict
   
   -- Check if extmarks need re-initialization (e.g., after undo to original state)

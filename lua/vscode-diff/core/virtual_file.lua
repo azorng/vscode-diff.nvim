@@ -8,7 +8,7 @@ local api = vim.api
 
 -- Helper function to load content into a virtual buffer and fire the loaded event
 local function load_virtual_buffer_content(buf, git_root, commit, filepath)
-  local git = require('vscode-diff.git')
+  local git = require('vscode-diff.core.git')
   
   git.get_file_content(commit, git_root, filepath, function(err, lines)
     vim.schedule(function()

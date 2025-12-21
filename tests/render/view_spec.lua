@@ -1,10 +1,10 @@
 -- Test: render/view.lua - Diff view creation and window management
 -- Critical tests for the main user-facing API
 
-local view = require("vscode-diff.render.view")
-local diff = require("vscode-diff.diff")
-local highlights = require("vscode-diff.render.highlights")
-local lifecycle = require("vscode-diff.render.lifecycle")
+local view = require("vscode-diff.ui.view")
+local diff = require('vscode-diff.core.diff')
+local highlights = require("vscode-diff.ui.highlights")
+local lifecycle = require("vscode-diff.ui.lifecycle")
 
 -- Helper to get temp path
 local function get_temp_path(filename)

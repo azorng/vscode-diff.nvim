@@ -2,8 +2,8 @@
 -- Watches buffer changes (internal and external) and triggers diff recomputation
 local M = {}
 
-local diff = require("vscode-diff.diff")
-local core = require("vscode-diff.render.core")
+local diff = require('vscode-diff.core.diff')
+local core = require("vscode-diff.ui.core")
 
 -- Throttle delay in milliseconds
 local THROTTLE_DELAY_MS = 200
@@ -47,7 +47,7 @@ local function do_diff_update(bufnr, skip_watcher_check)
   end
   
   -- Get buffer pair from lifecycle
-  local lifecycle = require('vscode-diff.render.lifecycle')
+  local lifecycle = require('vscode-diff.ui.lifecycle')
   local tabpage = lifecycle.find_tabpage_by_buffer(bufnr)
   if not tabpage then
     if watcher then
@@ -104,7 +104,7 @@ local function do_diff_update(bufnr, skip_watcher_check)
     -- Re-sync scrollbind after filler changes
     -- This ensures all windows stay aligned even if fillers were added/removed
     local original_win, modified_win, result_win = nil, nil, nil
-    local lifecycle = require('vscode-diff.render.lifecycle')
+    local lifecycle = require('vscode-diff.ui.lifecycle')
     local tabpage = vim.api.nvim_get_current_tabpage()
     local _, stored_result_win = lifecycle.get_result(tabpage)
     
@@ -252,7 +252,7 @@ local function do_result_diff_update(bufnr)
   end
 
   -- Get base_lines from lifecycle
-  local lifecycle = require('vscode-diff.render.lifecycle')
+  local lifecycle = require('vscode-diff.ui.lifecycle')
   local tabpage = lifecycle.find_tabpage_by_buffer(bufnr)
   if not tabpage then
     return

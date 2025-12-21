@@ -1,7 +1,7 @@
 -- Test: Installer Module
 -- Validates automatic binary installation and version management
 
-local installer = require("vscode-diff.installer")
+local installer = require('vscode-diff.core.installer')
 local version = require("vscode-diff.version")
 
 describe("Installer Module", function()

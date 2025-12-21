@@ -6,7 +6,7 @@ function M.setup(opts)
   local config = require("vscode-diff.config")
   config.setup(opts)
   
-  local render = require("vscode-diff.render")
+  local render = require("vscode-diff.ui")
   render.setup_highlights()
 end
 

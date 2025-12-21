@@ -1,9 +1,9 @@
 -- Test: render/lifecycle.lua - Lifecycle and cleanup management
 -- Critical tests for preventing memory leaks and state corruption
 
-local lifecycle = require("vscode-diff.render.lifecycle")
-local highlights = require("vscode-diff.render.highlights")
-local diff = require("vscode-diff.diff")
+local lifecycle = require("vscode-diff.ui.lifecycle")
+local highlights = require("vscode-diff.ui.highlights")
+local diff = require('vscode-diff.core.diff')
 
 describe("Render Lifecycle", function()
   before_each(function()

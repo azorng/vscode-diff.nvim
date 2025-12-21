@@ -25,7 +25,7 @@ local lib_path = plugin_root .. "/" .. lib_name
 
 -- Check if library exists or needs update, if so, install/update it
 -- Skip auto-installation if explicitly disabled (e.g., in tests where library is already built)
-local installer = require("vscode-diff.installer")
+local installer = require('vscode-diff.core.installer')
 if not vim.env.VSCODE_DIFF_NO_AUTO_INSTALL and installer.needs_update() then
   local success, err = installer.install({ silent = false })
   if not success then

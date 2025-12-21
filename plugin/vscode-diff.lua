@@ -4,10 +4,10 @@ if vim.g.loaded_vscode_diff then
 end
 vim.g.loaded_vscode_diff = 1
 
-local render = require("vscode-diff.render")
+local render = require("vscode-diff.ui")
 local commands = require("vscode-diff.commands")
-local virtual_file = require("vscode-diff.virtual_file")
-local git = require("vscode-diff.git")
+local virtual_file = require('vscode-diff.core.virtual_file')
+local git = require('vscode-diff.core.git')
 
 -- Setup virtual file scheme
 virtual_file.setup()

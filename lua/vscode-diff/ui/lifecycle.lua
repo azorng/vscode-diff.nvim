@@ -8,9 +8,9 @@
 -- - Access: Only through getters/setters
 local M = {}
 
-local highlights = require('vscode-diff.render.highlights')
+local highlights = require('vscode-diff.ui.highlights')
 local config = require('vscode-diff.config')
-local virtual_file = require('vscode-diff.virtual_file')
+local virtual_file = require('vscode-diff.core.virtual_file')
 
 -- Track active diff sessions
 -- Structure: { 
@@ -124,7 +124,7 @@ local function suspend_diff(tabpage)
   end
 
   -- Disable auto-refresh (stop watching buffer changes)
-  local auto_refresh = require('vscode-diff.auto_refresh')
+  local auto_refresh = require('vscode-diff.ui.auto_refresh')
   auto_refresh.disable(diff.original_bufnr)
   auto_refresh.disable(diff.modified_bufnr)
   if diff.result_bufnr then
@@ -184,7 +184,7 @@ local function resume_diff(tabpage)
 
   if need_recompute or not diff.stored_diff_result then
     -- Buffer or file changed, recompute diff
-    local diff_module = require('vscode-diff.diff')
+    local diff_module = require('vscode-diff.core.diff')
     lines_diff = diff_module.compute_diff(original_lines, modified_lines)
     diff_was_recomputed = true
 
@@ -205,7 +205,7 @@ local function resume_diff(tabpage)
 
   -- Render with fresh content and (possibly reused) diff result
   if lines_diff then
-    local core = require('vscode-diff.render.core')
+    local core = require('vscode-diff.ui.core')
     core.render_diff(diff.original_bufnr, diff.modified_bufnr, original_lines, modified_lines, lines_diff)
 
     -- Re-sync scrollbind ONLY if diff was recomputed (fillers may have changed)
@@ -254,7 +254,7 @@ local function resume_diff(tabpage)
   end
 
   -- Re-enable auto-refresh for real buffers only
-  local auto_refresh = require('vscode-diff.auto_refresh')
+  local auto_refresh = require('vscode-diff.ui.auto_refresh')
 
   -- Check if buffers are real files (not virtual) using revision
   local original_is_real = not is_virtual_revision(diff.original_revision)
@@ -412,7 +412,7 @@ local function cleanup_diff(tabpage)
   end
 
   -- Disable auto-refresh for both buffers
-  local auto_refresh = require('vscode-diff.auto_refresh')
+  local auto_refresh = require('vscode-diff.ui.auto_refresh')
   auto_refresh.disable(diff.original_bufnr)
   auto_refresh.disable(diff.modified_bufnr)
 
@@ -1029,8 +1029,8 @@ function M.setup_auto_sync_on_file_switch(tabpage, original_is_virtual, modified
       -- Path changed! Need to update both sides
       vim.schedule(function()
         -- Get git root (might have changed if user switched to different repo)
-        local git = require('vscode-diff.git')
-        local view = require('vscode-diff.render.view')
+        local git = require('vscode-diff.core.git')
+        local view = require('vscode-diff.ui.view')
 
         git.get_git_root(new_path, function(err, new_git_root)
           if err then

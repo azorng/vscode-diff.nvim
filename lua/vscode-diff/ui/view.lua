@@ -1,13 +1,13 @@
 -- Diff view creation and window management
 local M = {}
 
-local core = require('vscode-diff.render.core')
-local lifecycle = require('vscode-diff.render.lifecycle')
-local semantic = require('vscode-diff.render.semantic_tokens')
-local virtual_file = require('vscode-diff.virtual_file')
-local auto_refresh = require('vscode-diff.auto_refresh')
+local core = require('vscode-diff.ui.core')
+local lifecycle = require('vscode-diff.ui.lifecycle')
+local semantic = require('vscode-diff.ui.semantic_tokens')
+local virtual_file = require('vscode-diff.core.virtual_file')
+local auto_refresh = require('vscode-diff.ui.auto_refresh')
 local config = require('vscode-diff.config')
-local diff_module = require('vscode-diff.diff')
+local diff_module = require('vscode-diff.core.diff')
 
 -- Helper: Check if revision is virtual (commit hash or STAGED)
 -- Virtual: "STAGED" or commit hash | Real: nil or "WORKING"
@@ -323,7 +323,7 @@ local function setup_conflict_result_window(tabpage, session_config, original_wi
   auto_refresh.enable_for_result(result_bufnr)
 
   -- Initialize conflict tracking (keymaps setup separately after setup_all_keymaps)
-  local conflict_actions = require('vscode-diff.render.conflict_actions')
+  local conflict_actions = require('vscode-diff.ui.conflict_actions')
   conflict_actions.initialize_tracking(result_bufnr, conflict_diffs.conflict_blocks)
 
   -- Setup autocmd to refresh signs when result buffer changes (event-driven approach)
@@ -414,7 +414,7 @@ local function setup_all_keymaps(tabpage, original_bufnr, modified_bufnr, is_exp
       vim.notify("No explorer found for this tab", vim.log.levels.WARN)
       return
     end
-    local explorer = require('vscode-diff.render.explorer')
+    local explorer = require('vscode-diff.ui.explorer')
     explorer.navigate_next(explorer_obj)
   end
 
@@ -425,7 +425,7 @@ local function setup_all_keymaps(tabpage, original_bufnr, modified_bufnr, is_exp
       vim.notify("No explorer found for this tab", vim.log.levels.WARN)
       return
     end
-    local explorer = require('vscode-diff.render.explorer')
+    local explorer = require('vscode-diff.ui.explorer')
     explorer.navigate_prev(explorer_obj)
   end
 
@@ -445,7 +445,7 @@ local function setup_all_keymaps(tabpage, original_bufnr, modified_bufnr, is_exp
       vim.notify("No explorer found for this tab", vim.log.levels.WARN)
       return
     end
-    local explorer = require('vscode-diff.render.explorer')
+    local explorer = require('vscode-diff.ui.explorer')
     explorer.toggle_visibility(explorer_obj)
   end
 
@@ -748,7 +748,7 @@ function M.create(session_config, filetype, on_ready)
 
       if session_config.conflict then
         -- Conflict mode: Fetch base content and render both sides against base
-        local git = require('vscode-diff.git')
+        local git = require('vscode-diff.core.git')
         local base_revision = ":1"
 
         git.get_file_content(base_revision, session_config.git_root, session_config.original_path, function(err, base_lines)
@@ -790,7 +790,7 @@ function M.create(session_config, filetype, on_ready)
               if success then
                 setup_all_keymaps(tabpage, original_info.bufnr, modified_info.bufnr, false)
                 -- Setup conflict keymaps AFTER setup_all_keymaps to override do/dp
-                local conflict_actions = require('vscode-diff.render.conflict_actions')
+                local conflict_actions = require('vscode-diff.ui.conflict_actions')
                 conflict_actions.setup_keymaps(tabpage)
               end
               
@@ -908,7 +908,7 @@ function M.create(session_config, filetype, on_ready)
     local position = explorer_config.position or "left"
 
     -- Create explorer (explorer manages its own lifecycle and callbacks)
-    local explorer = require('vscode-diff.render.explorer')
+    local explorer = require('vscode-diff.ui.explorer')
     local status_result = session_config.explorer_data.status_result
 
     local explorer_obj = explorer.create(status_result, session_config.git_root, tabpage, nil, session_config.original_revision, session_config.modified_revision)
@@ -1033,7 +1033,7 @@ function M.update(tabpage, session_config, auto_scroll_to_first_hunk)
 
     if session_config.conflict then
       -- Conflict mode: Fetch base content and render both sides against base
-      local git = require('vscode-diff.git')
+      local git = require('vscode-diff.core.git')
       local base_revision = ":1"
       
       git.get_file_content(base_revision, session_config.git_root, session_config.original_path, function(err, base_lines)
@@ -1071,7 +1071,7 @@ function M.update(tabpage, session_config, auto_scroll_to_first_hunk)
             if success then
               setup_all_keymaps(tabpage, original_info.bufnr, modified_info.bufnr, is_explorer_mode)
               -- Setup conflict keymaps AFTER setup_all_keymaps to override do/dp
-              local conflict_actions = require('vscode-diff.render.conflict_actions')
+              local conflict_actions = require('vscode-diff.ui.conflict_actions')
               conflict_actions.setup_keymaps(tabpage)
             end
           end

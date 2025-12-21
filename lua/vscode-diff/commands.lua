@@ -4,8 +4,8 @@ local M = {}
 -- Subcommands available for :CodeDiff
 M.SUBCOMMANDS = { "merge", "file", "install" }
 
-local git = require("vscode-diff.git")
-local lifecycle = require("vscode-diff.render.lifecycle")
+local git = require('vscode-diff.core.git')
+local lifecycle = require("vscode-diff.ui.lifecycle")
 
 --- Handles diffing the current buffer against a given git revision.
 -- @param revision string: The git revision (e.g., "HEAD", commit hash, branch name) to compare the current file against.
@@ -55,7 +55,7 @@ local function handle_git_diff(revision, revision2)
           end
 
           vim.schedule(function()
-            local view = require('vscode-diff.render.view')
+            local view = require('vscode-diff.ui.view')
             ---@type SessionConfig
             local session_config = {
               mode = "standalone",
@@ -71,7 +71,7 @@ local function handle_git_diff(revision, revision2)
       else
         -- Compare revision vs working tree
         vim.schedule(function()
-          local view = require('vscode-diff.render.view')
+          local view = require('vscode-diff.ui.view')
           ---@type SessionConfig
           local session_config = {
             mode = "standalone",
@@ -93,7 +93,7 @@ local function handle_file_diff(file_a, file_b)
   local filetype = vim.filetype.match({ filename = file_a }) or ""
 
   -- Create diff view (no pre-reading needed, :edit will load content)
-  local view = require('vscode-diff.render.view')
+  local view = require('vscode-diff.ui.view')
   ---@type SessionConfig
   local session_config = {
     mode = "standalone",
@@ -136,7 +136,7 @@ local function handle_explorer(revision, revision2)
         end
 
         -- Create explorer view with empty diff panes initially
-        local view = require('vscode-diff.render.view')
+        local view = require('vscode-diff.ui.view')
 
         ---@type SessionConfig
         local session_config = {
@@ -226,7 +226,7 @@ function M.vscode_merge(opts)
 
   -- Ensure all required modules are loaded before we start vim.wait
   -- This prevents issues with lazy-loading during the wait loop
-  local view = require('vscode-diff.render.view')
+  local view = require('vscode-diff.ui.view')
   
   -- For synchronous execution (required by git mergetool), we need to block
   -- until the view is ready. Use vim.wait which processes the event loop.
@@ -327,7 +327,7 @@ function M.vscode_diff(opts)
     -- :CodeDiff install or :CodeDiff install!
     -- Handle both :CodeDiff! install and :CodeDiff install!
     local force = opts.bang or subcommand == "install!"
-    local installer = require("vscode-diff.installer")
+    local installer = require('vscode-diff.core.installer')
 
     if force then
       vim.notify("Reinstalling libvscode-diff...", vim.log.levels.INFO)
