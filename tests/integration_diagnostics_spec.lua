@@ -1,16 +1,32 @@
 -- Integration test: Verify virtual buffer diagnostics are disabled
 -- This is an end-to-end test that requires a real git repository
 
-describe("Virtual buffer diagnostics integration", function()
-  it("Disables diagnostics on virtual buffers in real CodeDiff usage", function()
-    -- Ensure plugin is loaded
-    if not vim.g.loaded_vscode_diff then
-      dofile(vim.fn.getcwd() .. '/plugin/vscode-diff.lua')
-    end
+local commands = require("codediff.commands")
 
+-- Setup CodeDiff command for tests
+local function setup_command()
+  if vim.fn.exists(':CodeDiff') ~= 2 then
+    vim.api.nvim_create_user_command("CodeDiff", function(opts)
+      commands.vscode_diff(opts)
+    end, {
+      nargs = "*",
+      bang = true,
+      complete = function()
+        return { "file", "install" }
+      end,
+    })
+  end
+end
+
+describe("Virtual buffer diagnostics integration", function()
+  before_each(function()
+    setup_command()
+  end)
+
+  it("Disables diagnostics on virtual buffers in real CodeDiff usage", function()
     -- Verify CodeDiff command exists
-    local commands = vim.api.nvim_get_commands({})
-    assert.is_not_nil(commands.CodeDiff, "CodeDiff command should be registered")
+    local has_command = vim.fn.exists(':CodeDiff') == 2
+    assert.is_true(has_command, "CodeDiff command should be registered")
 
     -- This test runs the actual :CodeDiff command and verifies behavior
     -- Skip if not in a git repo
@@ -24,7 +40,7 @@ describe("Virtual buffer diagnostics integration", function()
     vim.cmd('cd ' .. git_root)
 
     -- Edit a file that exists in history
-    local test_file = git_root .. "/lua/vscode-diff/git.lua"
+    local test_file = git_root .. "/lua/codediff/core/git.lua"
     if vim.fn.filereadable(test_file) == 0 then
       pending("test file not found")
       return
