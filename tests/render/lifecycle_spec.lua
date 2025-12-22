@@ -186,7 +186,7 @@ describe("Render Lifecycle", function()
     lifecycle.setup_autocmds()
 
     -- Verify autocmd group exists
-    local augroups = vim.api.nvim_get_autocmds({group = "vscode_diff_lifecycle"})
+    local augroups = vim.api.nvim_get_autocmds({group = "codediff_lifecycle"})
     assert.is_true(#augroups > 0, "Should create autocmd group with commands")
   end)
 
@@ -439,7 +439,7 @@ describe("Render Lifecycle", function()
     lifecycle.setup()
 
     -- Should not crash or create duplicate autocmds
-    local augroups = vim.api.nvim_get_autocmds({group = "vscode_diff_lifecycle"})
+    local augroups = vim.api.nvim_get_autocmds({group = "codediff_lifecycle"})
     assert.is_true(#augroups > 0, "Should have autocmds after multiple setups")
   end)
 

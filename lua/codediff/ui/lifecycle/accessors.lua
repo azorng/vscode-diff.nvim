@@ -277,7 +277,7 @@ function M.set_result(tabpage, result_bufnr, result_win)
 
   -- Mark result window with restore flag
   if result_win and vim.api.nvim_win_is_valid(result_win) then
-    vim.w[result_win].vscode_diff_restore = 1
+    vim.w[result_win].codediff_restore = 1
   end
 
   return true
@@ -424,7 +424,7 @@ function M.setup_auto_sync_on_file_switch(tabpage, original_is_virtual, modified
   local current_path = sess[working_side .. '_path']
 
   -- Setup listener using BufWinEnter (fires when buffer enters window, even if existing buffer)
-  local sync_group = vim.api.nvim_create_augroup('vscode_diff_working_sync_' .. tabpage, { clear = true })
+  local sync_group = vim.api.nvim_create_augroup('codediff_working_sync_' .. tabpage, { clear = true })
 
   -- Listen to BufWinEnter - fires when ANY buffer enters the window (including existing buffers)
   vim.api.nvim_create_autocmd('BufWinEnter', {
@@ -439,7 +439,7 @@ function M.setup_auto_sync_on_file_switch(tabpage, original_is_virtual, modified
       local new_path = vim.api.nvim_buf_get_name(args.buf)
 
       -- Skip virtual files - they're programmatic, not user navigation
-      if new_path:match('^vscodediff://') then
+      if new_path:match('^codediff://') then
         return
       end
 

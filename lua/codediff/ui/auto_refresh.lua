@@ -199,7 +199,7 @@ function M.enable(bufnr)
   }
 
   -- Setup autocmds for this buffer
-  local buf_augroup = vim.api.nvim_create_augroup('vscode_diff_auto_refresh_' .. bufnr, { clear = true })
+  local buf_augroup = vim.api.nvim_create_augroup('codediff_auto_refresh_' .. bufnr, { clear = true })
 
   -- Internal changes (user editing)
   vim.api.nvim_create_autocmd({ 'TextChanged', 'TextChangedI', 'TextChangedP' }, {
@@ -235,7 +235,7 @@ function M.disable(bufnr)
   watched_buffers[bufnr] = nil
 
   -- Clear autocmd group
-  pcall(vim.api.nvim_del_augroup_by_name, 'vscode_diff_auto_refresh_' .. bufnr)
+  pcall(vim.api.nvim_del_augroup_by_name, 'codediff_auto_refresh_' .. bufnr)
 end
 
 -- Track result buffer timers only (base_lines stored in lifecycle)
@@ -305,7 +305,7 @@ function M.enable_for_result(bufnr)
   M.disable_result(bufnr)
 
   -- Setup autocmds for this buffer
-  local buf_augroup = vim.api.nvim_create_augroup('vscode_diff_result_refresh_' .. bufnr, { clear = true })
+  local buf_augroup = vim.api.nvim_create_augroup('codediff_result_refresh_' .. bufnr, { clear = true })
 
   -- Internal changes (user editing)
   vim.api.nvim_create_autocmd({ 'TextChanged', 'TextChangedI', 'TextChangedP' }, {
@@ -339,7 +339,7 @@ function M.disable_result(bufnr)
   end
 
   -- Clear autocmd group
-  pcall(vim.api.nvim_del_augroup_by_name, 'vscode_diff_result_refresh_' .. bufnr)
+  pcall(vim.api.nvim_del_augroup_by_name, 'codediff_result_refresh_' .. bufnr)
 end
 
 -- Immediately refresh result buffer diff (call after programmatic changes)

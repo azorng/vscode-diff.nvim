@@ -10,7 +10,7 @@ M._set_session_module = function(s) session = s end
 M._set_state_module = function(s) state = s end
 
 -- Autocmd group for cleanup
-local augroup = vim.api.nvim_create_augroup('vscode_diff_lifecycle', { clear = true })
+local augroup = vim.api.nvim_create_augroup('codediff_lifecycle', { clear = true })
 
 -- Check if a revision represents a virtual buffer
 local function is_virtual_revision(revision)
@@ -103,20 +103,20 @@ local function cleanup_diff(tabpage)
 
   -- Clear window variables if windows still exist
   if vim.api.nvim_win_is_valid(diff.original_win) then
-    vim.w[diff.original_win].vscode_diff_restore = nil
+    vim.w[diff.original_win].codediff_restore = nil
   end
   if vim.api.nvim_win_is_valid(diff.modified_win) then
-    vim.w[diff.modified_win].vscode_diff_restore = nil
+    vim.w[diff.modified_win].codediff_restore = nil
   end
 
   -- Clear result window variable if exists (conflict mode)
   if diff.result_win and vim.api.nvim_win_is_valid(diff.result_win) then
-    vim.w[diff.result_win].vscode_diff_restore = nil
+    vim.w[diff.result_win].codediff_restore = nil
   end
 
   -- Clear result buffer signs (conflict mode)
   if diff.result_bufnr and vim.api.nvim_buf_is_valid(diff.result_bufnr) then
-    local result_signs_ns = vim.api.nvim_create_namespace("vscode-diff-result-signs")
+    local result_signs_ns = vim.api.nvim_create_namespace("codediff-result-signs")
     vim.api.nvim_buf_clear_namespace(diff.result_bufnr, result_signs_ns, 0, -1)
   end
 
@@ -124,9 +124,9 @@ local function cleanup_diff(tabpage)
   diff.conflict_files = {}
 
   -- Clear tab-specific autocmd groups
-  pcall(vim.api.nvim_del_augroup_by_name, 'vscode_diff_lifecycle_tab_' .. tabpage)
-  pcall(vim.api.nvim_del_augroup_by_name, 'vscode_diff_working_sync_' .. tabpage)
-  pcall(vim.api.nvim_del_augroup_by_name, 'VscodeDiffConflictSigns_' .. tabpage)
+  pcall(vim.api.nvim_del_augroup_by_name, 'codediff_lifecycle_tab_' .. tabpage)
+  pcall(vim.api.nvim_del_augroup_by_name, 'codediff_working_sync_' .. tabpage)
+  pcall(vim.api.nvim_del_augroup_by_name, 'CodeDiffConflictSigns_' .. tabpage)
 
   -- Remove from tracking
   active_diffs[tabpage] = nil
@@ -137,7 +137,7 @@ local function count_diff_windows()
   local count = 0
   for i = 1, vim.fn.winnr('$') do
     local win = vim.fn.win_getid(i)
-    if vim.w[win].vscode_diff_restore then
+    if vim.w[win].codediff_restore then
       count = count + 1
     end
   end
@@ -146,7 +146,7 @@ end
 
 -- Check if we should trigger cleanup for a window
 local function should_cleanup(winid)
-  return vim.w[winid].vscode_diff_restore and vim.api.nvim_win_is_valid(winid)
+  return vim.w[winid].codediff_restore and vim.api.nvim_win_is_valid(winid)
 end
 
 -- Setup autocmds for automatic cleanup

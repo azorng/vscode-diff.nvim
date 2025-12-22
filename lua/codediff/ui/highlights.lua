@@ -3,9 +3,9 @@ local M = {}
 local config = require('codediff.config')
 
 -- Namespaces for highlights and fillers
-M.ns_highlight = vim.api.nvim_create_namespace("vscode-diff-highlight")
-M.ns_filler = vim.api.nvim_create_namespace("vscode-diff-filler")
-M.ns_conflict = vim.api.nvim_create_namespace("vscode-diff-conflict")
+M.ns_highlight = vim.api.nvim_create_namespace("codediff-highlight")
+M.ns_filler = vim.api.nvim_create_namespace("codediff-filler")
+M.ns_conflict = vim.api.nvim_create_namespace("codediff-conflict")
 
 -- Helper function to adjust color brightness
 local function adjust_brightness(color, factor)

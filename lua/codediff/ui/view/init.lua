@@ -262,11 +262,11 @@ function M.create(session_config, filetype, on_ready)
 
     if has_virtual then
     -- Virtual file(s): Wait for BufReadCmd to load content
-    local group = vim.api.nvim_create_augroup('VscodeDiffVirtualFileHighlight_' .. tabpage, { clear = true })
+    local group = vim.api.nvim_create_augroup('CodeDiffVirtualFileHighlight_' .. tabpage, { clear = true })
 
     vim.api.nvim_create_autocmd('User', {
       group = group,
-      pattern = 'VscodeDiffVirtualFileLoaded',
+      pattern = 'CodeDiffVirtualFileLoaded',
       callback = function(event)
         if not event.data or not event.data.buf then return end
 
@@ -289,7 +289,7 @@ function M.create(session_config, filetype, on_ready)
 
     vim.api.nvim_create_autocmd('User', {
       group = group,
-      pattern = 'VscodeDiffVirtualFileLoaded',
+      pattern = 'CodeDiffVirtualFileLoaded',
       callback = function(event)
         if not event.data or not event.data.buf then return end
         local loaded_buf = event.data.buf
@@ -528,11 +528,11 @@ function M.update(tabpage, session_config, auto_scroll_to_first_hunk)
   -- This prevents race conditions where fast systems complete before the listener is ready
   local autocmd_group = nil
   if wait_state.original or wait_state.modified then
-    autocmd_group = vim.api.nvim_create_augroup('VscodeDiffVirtualFileUpdate_' .. tabpage, { clear = true })
+    autocmd_group = vim.api.nvim_create_augroup('CodeDiffVirtualFileUpdate_' .. tabpage, { clear = true })
 
     vim.api.nvim_create_autocmd('User', {
       group = autocmd_group,
-      pattern = 'VscodeDiffVirtualFileLoaded',
+      pattern = 'CodeDiffVirtualFileLoaded',
       callback = function(event)
         if not event.data or not event.data.buf then return end
 

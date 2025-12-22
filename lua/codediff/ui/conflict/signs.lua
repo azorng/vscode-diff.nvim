@@ -168,7 +168,7 @@ end
 function M.setup_sign_refresh_autocmd(tabpage, result_bufnr)
   if not result_bufnr or not vim.api.nvim_buf_is_valid(result_bufnr) then return end
   
-  local group = vim.api.nvim_create_augroup("VscodeDiffConflictSigns_" .. tabpage, { clear = true })
+  local group = vim.api.nvim_create_augroup("CodeDiffConflictSigns_" .. tabpage, { clear = true })
   
   vim.api.nvim_create_autocmd({"TextChanged", "TextChangedI"}, {
     group = group,

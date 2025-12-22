@@ -4,8 +4,8 @@ local M = {}
 
 local lifecycle = require('codediff.ui.lifecycle')
 
-local tracking_ns = vim.api.nvim_create_namespace("vscode-diff-conflict-tracking")
-local result_signs_ns = vim.api.nvim_create_namespace("vscode-diff-result-signs")
+local tracking_ns = vim.api.nvim_create_namespace("codediff-conflict-tracking")
+local result_signs_ns = vim.api.nvim_create_namespace("codediff-result-signs")
 
 -- Expose namespaces for other modules
 M.tracking_ns = tracking_ns

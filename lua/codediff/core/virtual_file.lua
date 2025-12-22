@@ -30,7 +30,7 @@ local function load_virtual_buffer_content(buf, git_root, commit, filepath)
         
         -- Fire loaded event so diff rendering proceeds
         api.nvim_exec_autocmds('User', {
-          pattern = 'VscodeDiffVirtualFileLoaded',
+          pattern = 'CodeDiffVirtualFileLoaded',
           data = { buf = buf }
         })
         return
@@ -59,7 +59,7 @@ local function load_virtual_buffer_content(buf, git_root, commit, filepath)
       vim.diagnostic.enable(false, { bufnr = buf })
       
       api.nvim_exec_autocmds('User', {
-        pattern = 'VscodeDiffVirtualFileLoaded',
+        pattern = 'CodeDiffVirtualFileLoaded',
         data = { buf = buf }
       })
     end)
@@ -80,7 +80,7 @@ function M.refresh_buffer(buf)
 end
 
 -- Create a fugitive-style URL for a git revision
--- Format: vscodediff:///<git-root>///<commit>/<filepath>
+-- Format: codediff:///<git-root>///<commit>/<filepath>
 -- Supports commit hash or :0 (staged index)
 function M.create_url(git_root, commit, filepath)
   -- Normalize and encode components
@@ -93,42 +93,42 @@ function M.create_url(git_root, commit, filepath)
   local encoded_commit = commit or 'HEAD'
   local encoded_path = filepath:gsub('^/', '')
   
-  return string.format('vscodediff:///%s///%s/%s', 
+  return string.format('codediff:///%s///%s/%s', 
     encoded_root, encoded_commit, encoded_path)
 end
 
--- Parse a vscodediff:// URL
+-- Parse a codediff:// URL
 -- Returns: git_root, commit, filepath
 function M.parse_url(url)
   -- Pattern accepts SHA hash (hex chars)
-  local pattern = '^vscodediff:///(.-)///([a-fA-F0-9]+)/(.+)$'
+  local pattern = '^codediff:///(.-)///([a-fA-F0-9]+)/(.+)$'
   local git_root, commit, filepath = url:match(pattern)
   if git_root and commit and filepath then
     return git_root, commit, filepath
   end
 
   -- Try symbolic ref pattern (HEAD, branch names, etc.)
-  local pattern_symbolic = '^vscodediff:///(.-)///([A-Za-z][A-Za-z0-9_~^%-]*)/(.+)$'
+  local pattern_symbolic = '^codediff:///(.-)///([A-Za-z][A-Za-z0-9_~^%-]*)/(.+)$'
   git_root, commit, filepath = url:match(pattern_symbolic)
   if git_root and commit and filepath then
     return git_root, commit, filepath
   end
 
   -- Try :N or :N: pattern for staged index (supports :0, :1:, :2:, :3:)
-  local pattern_staged = '^vscodediff:///(.-)///(:[0-9]:?)/(.+)$'
+  local pattern_staged = '^codediff:///(.-)///(:[0-9]:?)/(.+)$'
   git_root, commit, filepath = url:match(pattern_staged)
   return git_root, commit, filepath
 end
 
--- Setup the BufReadCmd autocmd to handle vscodediff:// URLs
+-- Setup the BufReadCmd autocmd to handle codediff:// URLs
 function M.setup()
   -- Create autocmd group
-  local group = api.nvim_create_augroup('VscodeDiffVirtualFile', { clear = true })
+  local group = api.nvim_create_augroup('CodeDiffVirtualFile', { clear = true })
 
-  -- Handle reading vscodediff:// URLs
+  -- Handle reading codediff:// URLs
   api.nvim_create_autocmd('BufReadCmd', {
     group = group,
-    pattern = 'vscodediff:///*',
+    pattern = 'codediff:///*',
     callback = function(args)
       local url = args.match
       local buf = args.buf
@@ -136,7 +136,7 @@ function M.setup()
       local git_root, commit, filepath = M.parse_url(url)
 
       if not git_root or not commit or not filepath then
-        vim.notify('Invalid vscodediff URL: ' .. url, vim.log.levels.ERROR)
+        vim.notify('Invalid codediff URL: ' .. url, vim.log.levels.ERROR)
         return
       end
 
@@ -152,7 +152,7 @@ function M.setup()
   -- Prevent writing to these buffers
   api.nvim_create_autocmd('BufWriteCmd', {
     group = group,
-    pattern = 'vscodediff:///*',
+    pattern = 'codediff:///*',
     callback = function()
       vim.notify('Cannot write to git revision buffer', vim.log.levels.WARN)
     end,

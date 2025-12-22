@@ -164,7 +164,7 @@ function M.wait_for_virtual_file_load(bufnr, timeout_ms)
   local group = vim.api.nvim_create_augroup('TestWaitVirtualFile', { clear = true })
   vim.api.nvim_create_autocmd('User', {
     group = group,
-    pattern = 'VscodeDiffVirtualFileLoaded',
+    pattern = 'CodeDiffVirtualFileLoaded',
     callback = function(event)
       if event.data and event.data.buf == bufnr then
         loaded = true

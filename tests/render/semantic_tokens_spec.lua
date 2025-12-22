@@ -56,8 +56,8 @@ describe("Semantic Tokens Rendering", function()
     local semantic = require("codediff.ui.semantic_tokens")
     
     local namespaces = vim.api.nvim_get_namespaces()
-    assert.is_not_nil(namespaces.vscode_diff_semantic_tokens, 
-      "vscode_diff_semantic_tokens namespace should be created")
+    assert.is_not_nil(namespaces.codediff_semantic_tokens, 
+      "codediff_semantic_tokens namespace should be created")
   end)
 
   -- Test 6: Integration test with real LSP (if available)
@@ -182,7 +182,7 @@ describe("Semantic Tokens Rendering", function()
     
     local url = virtual_file.create_url(git_root, commit, filepath)
     assert.equal("string", type(url), "URL should be a string")
-    assert.is_true(url:match("^vscodediff://") ~= nil, "URL should start with vscodediff://")
+    assert.is_true(url:match("^codediff://") ~= nil, "URL should start with codediff://")
     
     -- Test URL parsing (normalize both for comparison)
     local parsed_root, parsed_commit, parsed_path = virtual_file.parse_url(url)

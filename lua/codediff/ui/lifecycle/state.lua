@@ -64,7 +64,7 @@ local function get_file_mtime(bufnr)
   local bufname = vim.api.nvim_buf_get_name(bufnr)
 
   -- Virtual buffers don't have mtime
-  if bufname:match('^vscodediff://') or bufname == '' then
+  if bufname:match('^codediff://') or bufname == '' then
     return nil
   end
 

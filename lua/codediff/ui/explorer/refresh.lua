@@ -29,7 +29,7 @@ function M.setup_auto_refresh(explorer, tabpage)
   end
   
   -- Auto-refresh on BufWritePost (file save)
-  local group = vim.api.nvim_create_augroup('VscodeDiffExplorerRefresh_' .. tabpage, { clear = true })
+  local group = vim.api.nvim_create_augroup('CodeDiffExplorerRefresh_' .. tabpage, { clear = true })
   
   vim.api.nvim_create_autocmd('BufWritePost', {
     group = group,

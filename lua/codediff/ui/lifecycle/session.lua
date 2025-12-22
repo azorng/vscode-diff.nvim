@@ -99,8 +99,8 @@ function M.create_session(tabpage, mode, git_root, original_path, modified_path,
   }
 
   -- Mark windows with restore flag
-  vim.w[original_win].vscode_diff_restore = 1
-  vim.w[modified_win].vscode_diff_restore = 1
+  vim.w[original_win].codediff_restore = 1
+  vim.w[modified_win].codediff_restore = 1
 
   -- Apply inlay hint settings if configured
   if config.options.diff.disable_inlay_hints and vim.lsp.inlay_hint then
@@ -109,7 +109,7 @@ function M.create_session(tabpage, mode, git_root, original_path, modified_path,
   end
 
   -- Setup tab autocmds
-  local tab_augroup = vim.api.nvim_create_augroup('vscode_diff_lifecycle_tab_' .. tabpage, { clear = true })
+  local tab_augroup = vim.api.nvim_create_augroup('codediff_lifecycle_tab_' .. tabpage, { clear = true })
 
   -- Force disable winbar to prevent alignment issues
   local function ensure_no_winbar()

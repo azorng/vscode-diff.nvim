@@ -17,7 +17,7 @@ render.setup_highlights()
 
 -- Re-apply highlights on ColorScheme change
 vim.api.nvim_create_autocmd("ColorScheme", {
-  group = vim.api.nvim_create_augroup("VscodeDiffHighlights", { clear = true }),
+  group = vim.api.nvim_create_augroup("CodeDiffHighlights", { clear = true }),
   callback = function()
     render.setup_highlights()
   end,

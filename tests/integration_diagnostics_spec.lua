@@ -82,7 +82,7 @@ describe("Virtual buffer diagnostics integration", function()
     for _, win in ipairs(wins) do
       local buf = vim.api.nvim_win_get_buf(win)
       local name = vim.api.nvim_buf_get_name(buf)
-      local is_virtual = name:match('^vscodediff://')
+      local is_virtual = name:match('^codediff://')
 
       if is_virtual then
         virtual_buf_found = true

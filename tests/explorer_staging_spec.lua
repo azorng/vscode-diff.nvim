@@ -64,7 +64,7 @@ describe("Explorer Buffer Management", function()
     local event_fired = false
     local event_buf = nil
     vim.api.nvim_create_autocmd('User', {
-      pattern = 'VscodeDiffVirtualFileLoaded',
+      pattern = 'CodeDiffVirtualFileLoaded',
       callback = function(args)
         event_fired = true
         event_buf = args.data and args.data.buf
@@ -80,7 +80,7 @@ describe("Explorer Buffer Management", function()
     local ok = vim.wait(5000, function() return event_fired end, 50)
 
     assert.is_true(ok, "Event should fire within timeout")
-    assert.is_true(event_fired, "VscodeDiffVirtualFileLoaded should fire")
+    assert.is_true(event_fired, "CodeDiffVirtualFileLoaded should fire")
     assert.equals(buf, event_buf, "Event should report correct buffer")
 
     -- Verify buffer content matches git content
